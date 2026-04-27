@@ -148,63 +148,7 @@ const WEEKS = [
   { id:6, label:"Settimana 7", phase:3, dates:"7–12 Giu", phaseLabel:"FASE 3 — Ripasso Finale", focus:"🎓 Genere 8 · Radio 9 · Estetica 11 · Scienze 12" },
 ]
 
-export const DAILY: DailySchedule = {
-  "2026-04-27": {
-    label: "Lun 20 Apr",
-    hours: "5–6h",
-    week: 0,
-    sessions: [
-      { sub: "psico", dur: "2h", topic: "Introduzione — modalità comunicative, scopi, mittente/destinatario" },
-      { sub: "radio", dur: "1.5h", topic: "Radiodays Cap. 1-2 — Marconi, nascita radio in Italia, EIAR" },
-      { sub: "scog", dur: "1h", topic: "Cap. 1 — Introspezione sperimentale: nascita psicologia scientifica" },
-      { sub: "genere", dur: "1.5h", topic: "Inquinamento Visuale Cap. 1 — Media ecology (Postman), eco-visioni" },
-    ],
-  },
-  "2026-04-21": {
-    label: "Mar 21 Apr",
-    hours: "3–4h",
-    note: "Serata libera",
-    week: 0,
-    sessions: [
-      { sub: "psico", dur: "2h", topic: "Gesti (Cherologia, tipi, parametri) + Sguardi (Optologia)" },
-      { sub: "radio", dur: "1.5h", topic: "Radiodays Cap. 3-4 — Radio e fascismo, propaganda" },
-    ],
-  },
-  "2026-04-22": {
-    label: "Mer 22 Apr",
-    hours: "5–6h",
-    week: 0,
-    sessions: [
-      { sub: "psico", dur: "1.5h", topic: "Credenze e Inferenze — rete esplicativa, tipi di testo" },
-      { sub: "radio", dur: "1.5h", topic: "Televisioni Cap. 1 — Origini TV italiana 1938-1954, Carosello" },
-      { sub: "scog", dur: "1h", topic: "Cap. 1 — Comportamentismo: Pavlov, Watson, Skinner" },
-      { sub: "genere", dur: "1.5h", topic: "Inq. Visuale Cap. 2 — Serialità TV, femminismo neoliberista" },
-    ],
-  },
-  "2026-04-23": {
-    label: "Gio 23 Apr",
-    hours: "3–4h",
-    note: "Serata libera",
-    week: 0,
-    sessions: [
-      { sub: "psico", dur: "2h", topic: "Emozioni — Darwin / Ekman / Lewis" },
-      { sub: "genere", dur: "1.5h", topic: "Inq. Visuale Cap. 3 — Manifesto cyborg (Haraway), mediascape digitale" },
-    ],
-  },
-  "2026-04-24": { label: "Ven 24 Apr", busy: true, week: 0 },
-  "2026-04-25": { label: "Sab 25 Apr", busy: true, week: 0 },
-  "2026-04-26": {
-    label: "Dom 26 Apr",
-    hours: "3h",
-    sunday: true,
-    week: 0,
-    sessions: [
-      { sub: "psico", dur: "1h", topic: "Ripasso Sett. 1 — flashcard gesti, sguardi, emozioni" },
-      { sub: "radio", dur: "1h", topic: "Ripasso Sett. 1 — Radiodays Cap. 1-4 + timeline" },
-      { sub: "genere", dur: "0.5h", topic: "Ripasso Inq. Visuale Cap. 1-3" },
-      { sub: "psico", dur: "0.5h", topic: "Verifica settimanale" },
-    ],
-  },
+export const DAILY: DailySchedule = "2026-04-27":
   "2026-04-27": {
     label: "Lun 27 Apr",
     hours: "5–6h",
@@ -589,6 +533,7 @@ export const DAILY: DailySchedule = {
   },
 }
 
+
 export const BOOKINGS: Booking[] = [
   { date: "2026-05-01", label: "Apertura prenotazioni tutti gli esami", urgent: false },
   { date: "2026-06-02", label: "Scadenza prenotazione Psicologia (orale 5 Giu)", urgent: true },
@@ -598,5 +543,5 @@ export const BOOKINGS: Booking[] = [
   { date: "2026-06-09", label: "Scadenza prenotazione Scienze Cog. (scritto 12 Giu)", urgent: true },
 ]
 
-export const TODAY_STR = "2026-04-20"
+export const TODAY_STR = "2026-04-27"
 export const DAILY_GOAL_MIN = 300 // 5 hours
