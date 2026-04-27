@@ -164,7 +164,7 @@ export const DAILY: DailySchedule = "2026-04-27":
     label: "Mar 28 Apr",
     hours: "3–4h",
     note: "Serata libera",
-    week: 1,
+    week: 0,
     sessions: [
       { sub: "psico", dur: "2h", topic: "Inganno + Dibattito politico (Ethos, Dominanza, Discredito)" },
       { sub: "radio", dur: "2h", topic: "Radiodays Cap. 7-8 — Radio libere, sentenza 202/1976, web radio" },
@@ -173,7 +173,7 @@ export const DAILY: DailySchedule = "2026-04-27":
   "2026-04-29": {
     label: "Mer 29 Apr",
     hours: "5–6h",
-    week: 1,
+    week: 0,
     sessions: [
       { sub: "psico", dur: "1.5h", topic: "Ironia + Contagio + Empatia + Insulti e Ridicolizzazione" },
       { sub: "radio", dur: "1.5h", topic: "Televisioni Cap. 2 — Anni '60-'70, servizio pubblico RAI" },
@@ -185,7 +185,7 @@ export const DAILY: DailySchedule = "2026-04-27":
     label: "Gio 30 Apr",
     hours: "3–4h",
     note: "Serata libera",
-    week: 1,
+    week: 0,
     sessions: [
       { sub: "psico", dur: "2h", topic: "Manuale B1-B3 — Scopi/Credenze/Risorse, Potere e Immagine" },
       { sub: "est", dur: "1.5h", topic: "Lady Sapiens 2-3 — Ago, donna artista, cacciatrici" },
@@ -197,7 +197,7 @@ export const DAILY: DailySchedule = "2026-04-27":
     label: "Dom 3 Mag",
     hours: "3h",
     sunday: true,
-    week: 1,
+    week: 0,
     sessions: [
       { sub: "psico", dur: "1h", topic: "Simulazione orale Sett. 2 — 5 domande casuali" },
       { sub: "radio", dur: "1h", topic: "Ripasso Radiodays completo Cap. 1-8" },
