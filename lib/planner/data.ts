@@ -139,7 +139,7 @@ export const TOPICS: Topics = {
   ],
 }
 const WEEKS = [
-  { id:0, label:"Settimana 0", phase:1, dates:"27 Apr–3 Mag", phaseLabel:"FASE 1 — Studio di Base" },
+  { id:0, label:"Settimana 1", phase:1, dates:"27 Apr–3 Mag", phaseLabel:"FASE 1 — Studio di Base" },
   { id:1, label:"Settimana 2", phase:1, dates:"4–10 Mag", phaseLabel:"FASE 1 — Studio di Base" },
   { id:2, label:"Settimana 3", phase:2, dates:"11–17 Mag", phaseLabel:"FASE 2 — Ripasso Intensivo", focus:"Focus: Psicologia" },
   { id:3, label:"Settimana 4", phase:2, dates:"18–24 Mag", phaseLabel:"FASE 2 — Ripasso Intensivo", focus:"Focus: Radio & TV" },
