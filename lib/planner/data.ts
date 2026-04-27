@@ -138,55 +138,18 @@ export const TOPICS: Topics = {
     "Richardson Parte 3 — Cinque approcci + glossario 50 termini",
   ],
 }
-
-export const WEEKS: Week[] = [
-  { id: 0, label: "Settimana 1", phase: 1, dates: "20–26 Apr", phaseLabel: "FASE 1 — Studio di Base" },
-  { id: 1, label: "Settimana 2", phase: 1, dates: "27 Apr–3 Mag", phaseLabel: "FASE 1 — Studio di Base" },
-  { id: 2, label: "Settimana 3", phase: 1, dates: "4–10 Mag", phaseLabel: "FASE 1 — Studio di Base" },
-  {
-    id: 3,
-    label: "Settimana 4",
-    phase: 2,
-    dates: "11–17 Mag",
-    phaseLabel: "FASE 2 — Ripasso Intensivo",
-    focus: "Focus: Psicologia",
-  },
-  {
-    id: 4,
-    label: "Settimana 5",
-    phase: 2,
-    dates: "18–24 Mag",
-    phaseLabel: "FASE 2 — Ripasso Intensivo",
-    focus: "Focus: Radio & TV",
-  },
-  {
-    id: 5,
-    label: "Settimana 6",
-    phase: 2,
-    dates: "25–31 Mag",
-    phaseLabel: "FASE 2 — Ripasso Intensivo",
-    focus: "Focus: Estetica + Scienze + Genere",
-  },
-  {
-    id: 6,
-    label: "Settimana 7",
-    phase: 3,
-    dates: "1–5 Giu",
-    phaseLabel: "FASE 3 — Ripasso Finale",
-    focus: "Psicologia 5 Giu",
-  },
-  {
-    id: 7,
-    label: "Settimana 8",
-    phase: 3,
-    dates: "7–12 Giu",
-    phaseLabel: "FASE 3 — Ripasso Finale",
-    focus: "Genere 8 · Radio 9 · Estetica 11 · Scienze 12",
-  },
+const WEEKS = [
+  { id:0, label:"Settimana 1", phase:1, dates:"27 Apr–3 Mag", phaseLabel:"FASE 1 — Studio di Base" },
+  { id:1, label:"Settimana 2", phase:1, dates:"4–10 Mag", phaseLabel:"FASE 1 — Studio di Base" },
+  { id:2, label:"Settimana 3", phase:2, dates:"11–17 Mag", phaseLabel:"FASE 2 — Ripasso Intensivo", focus:"Focus: Psicologia" },
+  { id:3, label:"Settimana 4", phase:2, dates:"18–24 Mag", phaseLabel:"FASE 2 — Ripasso Intensivo", focus:"Focus: Radio & TV" },
+  { id:4, label:"Settimana 5", phase:2, dates:"25–31 Mag", phaseLabel:"FASE 2 — Ripasso Intensivo", focus:"Focus: Estetica + Scienze Cog. + Genere" },
+  { id:5, label:"Settimana 6", phase:3, dates:"1–5 Giu", phaseLabel:"FASE 3 — Ripasso Finale", focus:"🎓 Psicologia 5 Giu" },
+  { id:6, label:"Settimana 7", phase:3, dates:"7–12 Giu", phaseLabel:"FASE 3 — Ripasso Finale", focus:"🎓 Genere 8 · Radio 9 · Estetica 11 · Scienze 12" },
 ]
 
 export const DAILY: DailySchedule = {
-  "2026-04-20": {
+  "2026-04-27": {
     label: "Lun 20 Apr",
     hours: "5–6h",
     week: 0,
