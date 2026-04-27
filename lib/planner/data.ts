@@ -148,7 +148,8 @@ const WEEKS = [
   { id:6, label:"Settimana 7", phase:3, dates:"7–12 Giu", phaseLabel:"FASE 3 — Ripasso Finale", focus:"🎓 Genere 8 · Radio 9 · Estetica 11 · Scienze 12" },
 ]
 
-export const DAILY: DailySchedule = "2026-04-27":
+export const DAILY: DailySchedule = {
+}
   "2026-04-27": {
     label: "Lun 27 Apr",
     hours: "5–6h",
