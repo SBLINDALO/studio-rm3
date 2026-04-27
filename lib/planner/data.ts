@@ -203,7 +203,14 @@ export const DAILY: DailySchedule = "2026-04-27":
       { sub: "radio", dur: "1h", topic: "Ripasso Radiodays completo Cap. 1-8" },
       { sub: "genere", dur: "0.5h", topic: "Ripasso Inq. Visuale Cap. 4-5" },
       { sub: "est", dur: "0.5h", topic: "Verifica settimanale" },
-    ],
+    ],"2026-05-01":{ label:"Ven 1 Mag", busy:true, week:0 },
+"2026-05-02":{ label:"Sab 2 Mag", busy:true, week:0 },
+"2026-05-03":{ label:"Dom 3 Mag", hours:"3h", sunday:true, week:0, sessions:[
+  {sub:"psico", dur:"1h", topic:"Ripasso — gesti, sguardi, emozioni, influenzamento"},
+  {sub:"radio", dur:"1h", topic:"Ripasso Radiodays Cap. 1-4 + Televisioni Cap. 1-2"},
+  {sub:"genere", dur:"0.5h", topic:"Ripasso Inq. Visuale Cap. 1-3"},
+  {sub:"est", dur:"0.5h", topic:"Verifica settimanale — compila tab Verifica"},
+]},
   },
   "2026-05-04": {
     label: "Lun 4 Mag",
