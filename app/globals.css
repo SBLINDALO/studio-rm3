@@ -1,0 +1,306 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * ──────────────────────────────────────────────────────────────────────────
+ * Design tokens — "Quiet Study" visual language
+ * ──────────────────────────────────────────────────────────────────────────
+ *
+ * Principi:
+ *   1. Sfondi e bordi restano nei toni warm-neutral (stone/zinc/slate)
+ *      per ridurre la fatica visiva durante sessioni di studio prolungate.
+ *   2. Gli accenti cromatici vengono usati con parsimonia:
+ *        • Rose/rosso       → urgenze reali (arretrati, errori, retry)
+ *        • Ambra            → avvisi non bloccanti, suggerimenti
+ *        • Emerald          → successo, completato, online
+ *        • Blue/indaco      → stati informativi, link attivi
+ *   3. Le ombre sono morbide e stratificate, non più hard-offset.
+ *   4. La tipografia usa tre livelli chiari: display/body/caption.
+ */
+
+:root {
+  /* Superfici */
+  --bg: oklch(0.985 0.004 90);          /* #FBFBF9 — sfondo app */
+  --bg-subtle: oklch(0.975 0.006 90);   /* card secondarie */
+  --surface: oklch(1 0 0);              /* card primarie */
+  --surface-elevated: oklch(1 0 0);     /* modali, drawer */
+
+  /* Bordi */
+  --border-subtle: oklch(0.94 0.003 90); /* stone-100 */
+  --border: oklch(0.90 0.005 90);        /* stone-200 */
+  --border-strong: oklch(0.83 0.008 90); /* stone-300 */
+
+  /* Testi — gerarchia in tre livelli */
+  --fg: oklch(0.23 0.01 60);             /* stone-900 — headings */
+  --fg-muted: oklch(0.45 0.01 60);       /* stone-600 — body */
+  --fg-subtle: oklch(0.60 0.008 60);     /* stone-500 — captions */
+  --fg-faint: oklch(0.72 0.006 60);      /* stone-400 — meta */
+
+  /* Accenti semantici */
+  --accent-urgent: oklch(0.63 0.21 25);    /* rose-600: arretrati/errori */
+  --accent-warn: oklch(0.77 0.16 70);      /* amber-500: avvisi */
+  --accent-success: oklch(0.70 0.15 160);  /* emerald-500: completato */
+  --accent-info: oklch(0.60 0.18 255);     /* indigo-500: info */
+
+  /* Accenti materie — saturi ma armonizzati su chroma ~0.14-0.16 */
+  --sub-psico: oklch(0.68 0.15 15);    /* rose-400 */
+  --sub-radio: oklch(0.63 0.16 265);   /* indigo-500 */
+  --sub-est: oklch(0.75 0.16 75);      /* amber-500 */
+  --sub-scog: oklch(0.68 0.14 165);    /* emerald-500 */
+  --sub-genere: oklch(0.65 0.16 300);  /* violet-500 */
+
+  /* Radius scale */
+  --radius-xs: 0.375rem;  /* 6px  — chip, badge */
+  --radius-sm: 0.5rem;    /* 8px  — pulsanti piccoli */
+  --radius: 0.75rem;      /* 12px — pulsanti standard */
+  --radius-md: 1rem;      /* 16px — card */
+  --radius-lg: 1.25rem;   /* 20px — card grandi */
+  --radius-xl: 1.5rem;    /* 24px — modali */
+  --radius-full: 9999px;
+
+  /* Ombre stratificate — sostituiscono gli hard-offset del Soft Pop */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-sm:
+    0 1px 2px 0 rgb(0 0 0 / 0.04),
+    0 1px 3px 0 rgb(0 0 0 / 0.06);
+  --shadow:
+    0 2px 4px -1px rgb(0 0 0 / 0.04),
+    0 4px 8px -2px rgb(0 0 0 / 0.08);
+  --shadow-md:
+    0 4px 8px -2px rgb(0 0 0 / 0.06),
+    0 8px 16px -4px rgb(0 0 0 / 0.08);
+  --shadow-lg:
+    0 8px 16px -4px rgb(0 0 0 / 0.08),
+    0 16px 32px -8px rgb(0 0 0 / 0.10);
+  --shadow-xl:
+    0 12px 24px -6px rgb(0 0 0 / 0.10),
+    0 24px 48px -12px rgb(0 0 0 / 0.12);
+
+  /* Variabili consumate da shadcn/ui — mappate sui nuovi token */
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--fg);
+  --primary: oklch(0.23 0.01 60);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--fg);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--bg-subtle);
+  --accent-foreground: var(--fg);
+  --destructive: var(--accent-urgent);
+  --destructive-foreground: oklch(1 0 0);
+  --border: var(--border);
+  --input: var(--border);
+  --ring: oklch(0.60 0.008 60 / 0.5);
+  --sidebar: var(--bg);
+  --sidebar-foreground: var(--fg);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: var(--bg-subtle);
+  --sidebar-accent-foreground: var(--fg);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  --chart-1: var(--sub-psico);
+  --chart-2: var(--sub-radio);
+  --chart-3: var(--sub-est);
+  --chart-4: var(--sub-scog);
+  --chart-5: var(--sub-genere);
+}
+
+.dark {
+  --bg: oklch(0.16 0.005 60);
+  --bg-subtle: oklch(0.20 0.006 60);
+  --surface: oklch(0.22 0.007 60);
+  --surface-elevated: oklch(0.25 0.008 60);
+
+  --border-subtle: oklch(0.26 0.007 60);
+  --border: oklch(0.30 0.008 60);
+  --border-strong: oklch(0.38 0.010 60);
+
+  --fg: oklch(0.96 0.003 90);
+  --fg-muted: oklch(0.78 0.006 60);
+  --fg-subtle: oklch(0.62 0.008 60);
+  --fg-faint: oklch(0.50 0.008 60);
+
+  --accent-urgent: oklch(0.72 0.18 25);
+  --accent-warn: oklch(0.82 0.15 75);
+  --accent-success: oklch(0.78 0.14 165);
+  --accent-info: oklch(0.72 0.16 260);
+
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+  --shadow-sm:
+    0 1px 2px 0 rgb(0 0 0 / 0.25),
+    0 1px 3px 0 rgb(0 0 0 / 0.30);
+  --shadow:
+    0 2px 4px -1px rgb(0 0 0 / 0.30),
+    0 4px 8px -2px rgb(0 0 0 / 0.40);
+  --shadow-md:
+    0 4px 8px -2px rgb(0 0 0 / 0.35),
+    0 8px 16px -4px rgb(0 0 0 / 0.45);
+  --shadow-lg:
+    0 8px 16px -4px rgb(0 0 0 / 0.40),
+    0 16px 32px -8px rgb(0 0 0 / 0.50);
+
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--fg);
+  --primary: oklch(0.96 0.003 90);
+  --primary-foreground: oklch(0.16 0.005 60);
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--fg);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--bg-subtle);
+  --accent-foreground: var(--fg);
+  --destructive: var(--accent-urgent);
+  --destructive-foreground: oklch(0.16 0.005 60);
+  --border: var(--border);
+  --input: var(--border);
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-serif: 'Source Serif 4', 'Source Serif 4 Fallback';
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* iOS safe areas */
+  html {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+
+  /* Better focus rings for keyboard users */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Tabular numerals everywhere numbers matter */
+  [class*="tabular-nums"], .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+}
+
+@layer components {
+  /* Card base — sostituisce il pattern "border-black shadow-[..]" del Soft Pop */
+  .card-quiet {
+    @apply rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)];
+    box-shadow: var(--shadow-xs);
+    transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
+  }
+
+  .card-quiet-hover:hover {
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border);
+    transform: translateY(-1px);
+  }
+
+  /* Card urgente — solo per stati critici (arretrati etc.) */
+  .card-urgent {
+    @apply rounded-2xl border bg-rose-50/70;
+    border-color: color-mix(in oklch, var(--accent-urgent) 35%, transparent);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Pill / chip */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium;
+  }
+
+  /* Glass surface — per modali e drawer */
+  .glass {
+    background: color-mix(in oklch, var(--surface-elevated) 88%, transparent);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+  }
+
+  /* Inset divider — per separare sezioni senza pesare visivamente */
+  .divider {
+    @apply h-px w-full bg-[var(--border-subtle)];
+  }
+}
+
+@layer utilities {
+  /* Scrollbar più discreta */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Nasconde lo scrollbar mantenendo lo scroll */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+}
