@@ -139,7 +139,7 @@ export const TOPICS: Topics = {
   ],
 }
 const WEEKS = [
-  { id:0, label:"Settimana 1", phase:1, dates:"27 Apr–3 Mag", phaseLabel:"FASE 1 — Studio di Base" },
+  { id:0, label:"Settimana 0", phase:1, dates:"27 Apr–3 Mag", phaseLabel:"FASE 1 — Studio di Base" },
   { id:1, label:"Settimana 2", phase:1, dates:"4–10 Mag", phaseLabel:"FASE 1 — Studio di Base" },
   { id:2, label:"Settimana 3", phase:2, dates:"11–17 Mag", phaseLabel:"FASE 2 — Ripasso Intensivo", focus:"Focus: Psicologia" },
   { id:3, label:"Settimana 4", phase:2, dates:"18–24 Mag", phaseLabel:"FASE 2 — Ripasso Intensivo", focus:"Focus: Radio & TV" },
@@ -152,7 +152,7 @@ export const DAILY: DailySchedule = "2026-04-27":
   "2026-04-27": {
     label: "Lun 27 Apr",
     hours: "5–6h",
-    week: 1,
+    week: 0,
     sessions: [
       { sub: "psico", dur: "1.5h", topic: "Influenzamento e Persuasione — Aristotele (ethos, pathos, logos)" },
       { sub: "radio", dur: "1.5h", topic: "Radiodays Cap. 5-6 — Dopoguerra, RAI, Alto Gradimento" },
