@@ -149,7 +149,6 @@ const WEEKS = [
 ]
 
 export const DAILY: DailySchedule = {
-}
   "2026-04-27": {
     label: "Lun 27 Apr",
     hours: "5–6h",
