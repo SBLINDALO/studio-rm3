@@ -551,7 +551,8 @@ export const BOOKINGS: Booking[] = [
 ]
 
 export const TODAY_STR = "2026-04-27"
-export const DAILY_GOAL_MIN = 300 // 5 hoursexport const WEEKS: Week[] = [
+export const DAILY_GOAL_MIN = 300 // 5 hours
+export const WEEKS: Week[] = [
   { id:0, label:"Settimana 1", phase:1, dates:"27 Apr–3 Mag", phaseLabel:"FASE 1 — Studio di Base" },
   { id:1, label:"Settimana 2", phase:1, dates:"4–10 Mag", phaseLabel:"FASE 1 — Studio di Base" },
   { id:2, label:"Settimana 3", phase:2, dates:"11–17 Mag", phaseLabel:"FASE 2 — Ripasso Intensivo", focus:"Focus: Psicologia" },
