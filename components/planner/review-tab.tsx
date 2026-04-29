@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Check, AlertTriangle, X, FileText } from "lucide-react"
 import { WEEKS, SUBJECTS, C, PHASE_COLOR } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
+import { StatsView } from "./stats-view"
 import type { PlannerData, SubjectKey } from "@/lib/planner/types"
 
 interface Props {
@@ -35,6 +36,8 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
       <p className="px-0.5 text-[12px] text-stone-600">
         Da compilare ogni domenica. I dati vengono salvati automaticamente.
       </p>
+
+      <StatsView sessions={data.sessions} topics={data.topics} />
 
       {/* Week selector */}
       <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1">

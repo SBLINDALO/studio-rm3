@@ -17,7 +17,7 @@ export function TabsNav({ tab, onChange }: { tab: TabId; onChange: (t: TabId) =>
   return (
     <nav
       aria-label="Navigazione principale"
-      className="glass fixed bottom-0 left-1/2 z-50 w-full max-w-[680px] -translate-x-1/2 border-t border-[var(--border-subtle)] px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2"
+      className="glass fixed bottom-0 left-1/2 z-50 w-full max-w-[680px] -translate-x-1/2 border-t border-stone-200/30 shadow-sm px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2"
     >
       <div className="flex items-stretch justify-between gap-0.5">
         {TABS.map(({ id, label, Icon }) => {
@@ -26,7 +26,7 @@ export function TabsNav({ tab, onChange }: { tab: TabId; onChange: (t: TabId) =>
             <button
               key={id}
               onClick={() => onChange(id)}
-              className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1.5 transition-colors"
+              className="relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1.5 transition-colors transition-transform active:scale-95"
               aria-current={active ? "page" : undefined}
             >
               {active && (

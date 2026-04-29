@@ -21,28 +21,74 @@ const initialData: PlannerData = {
 export function usePlanner() {
   const [data, setData] = useState<PlannerData>(initialData)
   const [loaded, setLoaded] = useState(false)
-  const { syncTopic } = useSupabaseSync()
+  const { syncTopic, loadProgressFromSupabase, syncDaily, syncNote, syncConf, syncCheck, syncSession, syncCatchup, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase, loadCatchupFromSupabase } = useSupabaseSync()
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw) as PlannerData
-        if (!parsed.sessions) parsed.sessions = []
-        if (!parsed.topics) parsed.topics = {}
-        if (!parsed.daily) parsed.daily = {}
-        if (!parsed.notes) parsed.notes = {}
-        if (!parsed.conf) parsed.conf = {}
-        if (!parsed.check) parsed.check = {}
-        if (!parsed.catchup) parsed.catchup = []
-        if (!parsed.dismissedSkips) parsed.dismissedSkips = {}
+    const loadData = async () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY)
+        let parsed = initialData
+        if (raw) {
+          parsed = JSON.parse(raw) as PlannerData
+          if (!parsed.sessions) parsed.sessions = []
+          if (!parsed.topics) parsed.topics = {}
+          if (!parsed.daily) parsed.daily = {}
+          if (!parsed.notes) parsed.notes = {}
+          if (!parsed.conf) parsed.conf = {}
+          if (!parsed.check) parsed.check = {}
+          if (!parsed.catchup) parsed.catchup = []
+          if (!parsed.dismissedSkips) parsed.dismissedSkips = {}
+        }
+
+        // Carica tutti i dati da Supabase e unisci
+        const [supabaseProgress, supabaseDaily, supabaseNotes, supabaseConf, supabaseCheck, supabaseSessions, supabaseCatchup] = await Promise.all([
+          loadProgressFromSupabase(),
+          loadDailyFromSupabase(),
+          loadNotesFromSupabase(),
+          loadConfFromSupabase(),
+          loadCheckFromSupabase(),
+          loadSessionsFromSupabase(),
+          loadCatchupFromSupabase(),
+        ])
+
+        // Unisci topics
+        const mergedTopics = { ...parsed.topics }
+        for (const [key, progress] of Object.entries(supabaseProgress)) {
+          const status: TopicStatus = progress.is_completed ? "done" : progress.review_status === "review" ? "review" : null
+          mergedTopics[key] = status
+        }
+        parsed.topics = mergedTopics
+
+        // Unisci daily
+        parsed.daily = { ...parsed.daily, ...supabaseDaily }
+
+        // Unisci notes
+        parsed.notes = { ...parsed.notes, ...supabaseNotes }
+
+        // Unisci conf
+        parsed.conf = { ...parsed.conf, ...supabaseConf }
+
+        // Unisci check
+        parsed.check = { ...parsed.check, ...supabaseCheck }
+
+        // Unisci sessions (merge senza duplicati)
+        const existingSessionIds = new Set(parsed.sessions.map(s => s.id))
+        const newSessions = supabaseSessions.filter(s => !existingSessionIds.has(s.id))
+        parsed.sessions = [...parsed.sessions, ...newSessions]
+
+        // Unisci catchup (merge senza duplicati)
+        const existingCatchupIds = new Set(parsed.catchup.map(c => c.id))
+        const newCatchup = supabaseCatchup.filter(c => !existingCatchupIds.has(c.id))
+        parsed.catchup = [...parsed.catchup, ...newCatchup]
+
         setData(parsed)
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
+      setLoaded(true)
     }
-    setLoaded(true)
-  }, [])
+    loadData()
+  }, [loadProgressFromSupabase, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase, loadCatchupFromSupabase])
 
   const save = useCallback((next: PlannerData) => {
     setData(next)
@@ -75,38 +121,64 @@ export function usePlanner() {
   const toggleDaily = useCallback(
     (dayStr: string, ti: number) => {
       const k = `${dayStr}_${ti}`
-      save({ ...data, daily: { ...data.daily, [k]: !data.daily[k] } })
+      const isDone = !data.daily[k]
+      save({ ...data, daily: { ...data.daily, [k]: isDone } })
+      
+      // Sincronizza con Supabase
+      syncDaily(dayStr, ti, isDone).catch(() => {
+        // Fallback già gestito
+      })
     },
-    [data, save],
+    [data, save, syncDaily],
   )
 
   const setNote = useCallback(
     (weekIdx: number, value: string) => {
       save({ ...data, notes: { ...data.notes, [weekIdx]: value } })
+      
+      // Sincronizza con Supabase
+      syncNote(weekIdx, value).catch(() => {
+        // Fallback già gestito
+      })
     },
-    [data, save],
+    [data, save, syncNote],
   )
 
   const setCheck = useCallback(
     (key: string, value: number) => {
       save({ ...data, check: { ...data.check, [key]: value } })
+      
+      // Sincronizza con Supabase
+      syncCheck(key, value).catch(() => {
+        // Fallback già gestito
+      })
     },
-    [data, save],
+    [data, save, syncCheck],
   )
 
   const setConf = useCallback(
     (key: string, value: number) => {
       save({ ...data, conf: { ...data.conf, [key]: value } })
+      
+      // Sincronizza con Supabase
+      syncConf(key, value).catch(() => {
+        // Fallback già gestito
+      })
     },
-    [data, save],
+    [data, save, syncConf],
   )
 
   const logSession = useCallback(
     (session: Omit<LoggedSession, "id" | "date">) => {
       const s: LoggedSession = { ...session, id: Date.now(), date: TODAY_STR }
       save({ ...data, sessions: [...(data.sessions || []), s] })
+      
+      // Sincronizza con Supabase
+      syncSession(s).catch(() => {
+        // Fallback già gestito
+      })
     },
-    [data, save],
+    [data, save, syncSession],
   )
 
   const getProgress = useCallback(
@@ -165,9 +237,17 @@ export function usePlanner() {
   const addCatchupItems = useCallback(
     (items: CatchupItem[]) => {
       if (items.length === 0) return
-      save({ ...data, catchup: [...(data.catchup ?? []), ...items] })
+      const newCatchup = [...(data.catchup ?? []), ...items]
+      save({ ...data, catchup: newCatchup })
+      
+      // Sincronizza con Supabase
+      items.forEach(item => {
+        syncCatchup(item).catch(() => {
+          // Fallback già gestito
+        })
+      })
     },
-    [data, save],
+    [data, save, syncCatchup],
   )
 
   // Toggle the done state of a catchup item (user completed the rescheduled work)
@@ -177,8 +257,16 @@ export function usePlanner() {
         c.id === id ? { ...c, done: !c.done } : c,
       )
       save({ ...data, catchup: next })
+      
+      // Sincronizza con Supabase
+      const updatedItem = next.find(c => c.id === id)
+      if (updatedItem) {
+        syncCatchup(updatedItem).catch(() => {
+          // Fallback già gestito
+        })
+      }
     },
-    [data, save],
+    [data, save, syncCatchup],
   )
 
   // Remove a rescheduled catchup item (brings it back into the skipped queue)

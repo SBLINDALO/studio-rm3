@@ -169,7 +169,7 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --font-serif: 'Source Serif 4', 'Source Serif 4 Fallback';
 
@@ -220,6 +220,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-text-size-adjust: 100%;
   }
@@ -236,6 +237,14 @@
     border-radius: var(--radius-xs);
   }
 
+  button {
+    transition: transform 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  }
+
+  button:active {
+    transform: scale(0.95);
+  }
+
   /* Tabular numerals everywhere numbers matter */
   [class*="tabular-nums"], .num {
     font-variant-numeric: tabular-nums;
@@ -246,8 +255,8 @@
 @layer components {
   /* Card base — sostituisce il pattern "border-black shadow-[..]" del Soft Pop */
   .card-quiet {
-    @apply rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)];
-    box-shadow: var(--shadow-xs);
+    @apply rounded-[16px] border border-stone-200 bg-[var(--surface)];
+    box-shadow: var(--shadow-sm);
     transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
   }
 
@@ -271,9 +280,23 @@
 
   /* Glass surface — per modali e drawer */
   .glass {
-    background: color-mix(in oklch, var(--surface-elevated) 88%, transparent);
-    backdrop-filter: blur(14px) saturate(160%);
-    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    background: color-mix(in oklch, var(--surface-elevated) 80%, transparent);
+    backdrop-filter: blur(15px) saturate(160%);
+    -webkit-backdrop-filter: blur(15px) saturate(160%);
+  }
+
+  .progress-shimmer {
+    background-size: 300% 100%;
+    animation: shimmer 3s linear infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 0% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 
   /* Inset divider — per separare sezioni senza pesare visivamente */

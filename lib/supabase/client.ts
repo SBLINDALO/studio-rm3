@@ -23,3 +23,69 @@ export type UserProgress = {
   note: string | null
   updated_at: string
 }
+
+// Tipo per user_daily
+export type UserDaily = {
+  id: string
+  user_id: string
+  day_str: string
+  session_index: number
+  is_done: boolean
+  updated_at: string
+}
+
+// Tipo per user_notes
+export type UserNote = {
+  id: string
+  user_id: string
+  week_index: number
+  note: string
+  updated_at: string
+}
+
+// Tipo per user_conf
+export type UserConf = {
+  id: string
+  user_id: string
+  conf_key: string
+  value: number
+  updated_at: string
+}
+
+// Tipo per user_check
+export type UserCheck = {
+  id: string
+  user_id: string
+  check_key: string
+  value: number
+  updated_at: string
+}
+
+// Tipo per user_sessions
+export type UserSession = {
+  id: string
+  user_id: string
+  session_id: number
+  date: string
+  subject: string | null
+  duration: number
+  mode: string
+  start_time: string
+  created_at: string
+}
+
+// Tipo per user_catchup
+export type UserCatchup = {
+  id: string
+  user_id: string
+  catchup_id: string
+  orig_day: string
+  orig_idx: number
+  sub: string
+  dur: string
+  topic: string
+  target_day: string
+  done: boolean
+  created_at: string
+  updated_at: string
+}
