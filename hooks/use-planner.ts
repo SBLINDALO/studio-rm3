@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import type { CatchupItem, PlannerData, SubjectKey, TopicStatus, LoggedSession } from "@/lib/planner/types"
 import { SUBJECTS, TOPICS, TODAY_STR } from "@/lib/planner/data"
+import { useSupabaseSync } from "./use-supabase-sync"
 
 const STORAGE_KEY = "planner5v3"
 
@@ -20,6 +21,7 @@ const initialData: PlannerData = {
 export function usePlanner() {
   const [data, setData] = useState<PlannerData>(initialData)
   const [loaded, setLoaded] = useState(false)
+  const { syncTopic } = useSupabaseSync()
 
   useEffect(() => {
     try {
@@ -59,8 +61,15 @@ export function usePlanner() {
       const topics = { ...data.topics, [k]: ns }
       if (!ns) delete topics[k]
       save({ ...data, topics })
+      
+      // Sincronizza con Supabase (non bloccare l'UI)
+      if (ns) {
+        syncTopic(sub, i, status).catch(() => {
+          // Fallback già gestito in useSupabaseSync
+        })
+      }
     },
-    [data, save],
+    [data, save, syncTopic],
   )
 
   const toggleDaily = useCallback(
