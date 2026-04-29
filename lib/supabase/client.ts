@@ -21,6 +21,7 @@ export type UserProgress = {
   review_status: "review" | null
   confidence: number | null
   note: string | null
+  notes_data?: { questions: { id: string; question: string; answer: string }[] } | null
   updated_at: string
 }
 

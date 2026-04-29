@@ -1,20 +1,79 @@
 "use client"
 
-import { useState } from "react"
+import { type FormEvent, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Check, Undo2, GraduationCap, ChevronDown } from "lucide-react"
+import { Check, Undo2, GraduationCap, ChevronDown, BookOpen, Eye, Plus } from "lucide-react"
 import { TOPICS, SUBJECTS, C } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
-import type { PlannerData, SubjectKey } from "@/lib/planner/types"
+import type { ActiveRecallQuestion, PlannerData, SubjectKey } from "@/lib/planner/types"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface Props {
   data: PlannerData
+  quiz: Record<string, { questions: ActiveRecallQuestion[] }>
   toggleTopic: (sub: SubjectKey, i: number, status: "done" | "review") => void
+  saveTopicQuiz: (sub: SubjectKey, i: number, quizEntry: { questions: ActiveRecallQuestion[] }) => void
   getProgress: (sub: SubjectKey) => { done: number; total: number; pct: number }
 }
 
-export function TrackerTab({ data, toggleTopic, getProgress }: Props) {
+export function TrackerTab({ data, quiz, toggleTopic, saveTopicQuiz, getProgress }: Props) {
   const [expanded, setExpanded] = useState<SubjectKey | null>(null)
+  const [activeQuiz, setActiveQuiz] = useState<{
+    key: string
+    sub: SubjectKey
+    index: number
+    topic: string
+  } | null>(null)
+  const [newQuestion, setNewQuestion] = useState("")
+  const [newAnswer, setNewAnswer] = useState("")
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({})
+
+  const closeQuizModal = () => {
+    setActiveQuiz(null)
+    setNewQuestion("")
+    setNewAnswer("")
+    setRevealed({})
+  }
+
+  const currentQuestions = activeQuiz ? quiz[activeQuiz.key]?.questions ?? [] : []
+
+  const handleAddQuestion = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!activeQuiz || !newQuestion.trim() || !newAnswer.trim()) return
+
+    const nextQuestion: ActiveRecallQuestion = {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      question: newQuestion.trim(),
+      answer: newAnswer.trim(),
+    }
+
+    const nextQuestions = [...currentQuestions, nextQuestion]
+    saveTopicQuiz(activeQuiz.sub, activeQuiz.index, { questions: nextQuestions })
+    setNewQuestion("")
+    setNewAnswer("")
+    setRevealed((prev) => ({ ...prev, [nextQuestion.id]: false }))
+  }
+
+  const openQuizModal = (sub: SubjectKey, index: number, topic: string, key: string) => {
+    setActiveQuiz({ sub, index, topic, key })
+    setRevealed({})
+  }
+
+  const toggleReveal = (id: string) => {
+    setRevealed((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const handleMarkGood = () => {
+    if (!activeQuiz) return
+    toggleTopic(activeQuiz.sub, activeQuiz.index, "done")
+    closeQuizModal()
+  }
+
+  const handleMarkReview = () => {
+    if (!activeQuiz) return
+    toggleTopic(activeQuiz.sub, activeQuiz.index, "review")
+    closeQuizModal()
+  }
 
   return (
     <div className="space-y-3">
@@ -176,6 +235,14 @@ export function TrackerTab({ data, toggleTopic, getProgress }: Props) {
                         >
                           <Undo2 size={13} strokeWidth={2.5} />
                         </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.92 }}
+                          onClick={() => openQuizModal(sub, i, topic, k)}
+                          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                          aria-label="Apri il richiamo attivo"
+                        >
+                          <BookOpen size={14} />
+                        </motion.button>
                       </div>
                     )
                   })}
@@ -185,6 +252,110 @@ export function TrackerTab({ data, toggleTopic, getProgress }: Props) {
           </motion.article>
         )
       })}
+
+      <Dialog open={Boolean(activeQuiz)} onOpenChange={(isOpen) => { if (!isOpen) closeQuizModal() }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Richiamo attivo</DialogTitle>
+            <DialogDescription>
+              Usa questa sezione per trasformare il capitolo in domande chiuse e verificare la tua risposta.
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeQuiz && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <div className="font-medium text-slate-900">{activeQuiz.topic}</div>
+                <div className="mt-1 text-slate-600">{quiz[activeQuiz.key]?.questions?.length ?? 0} domande salvate</div>
+              </div>
+
+              <div className="space-y-3">
+                {(quiz[activeQuiz.key]?.questions ?? []).length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-sm text-slate-500">
+                    Nessuna domanda ancora. Aggiungi una domanda di richiamo e prova a rispondere senza guardare.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(quiz[activeQuiz.key]?.questions ?? []).map((question) => (
+                      <div key={question.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="flex items-center justify-between gap-3 text-sm font-medium text-slate-900">
+                          <span>{question.question}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleReveal(question.id)}
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+                          >
+                            <Eye size={14} />
+                            {revealed[question.id] ? "Nascondi" : "Mostra risposta"}
+                          </button>
+                        </div>
+                        {revealed[question.id] && (
+                          <div className="mt-3 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            {question.answer}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <form onSubmit={handleAddQuestion} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-900">Domanda</label>
+                  <input
+                    value={newQuestion}
+                    onChange={(event) => setNewQuestion(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    placeholder="Scrivi una domanda chiusa"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-900">Risposta</label>
+                  <input
+                    value={newAnswer}
+                    onChange={(event) => setNewAnswer(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    placeholder="Scrivi la risposta corretta"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  <Plus size={14} /> Aggiungi domanda
+                </button>
+              </form>
+
+              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+                <div className="flex flex-1 flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleMarkReview}
+                    className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                  >
+                    Devo ripassare
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleMarkGood}
+                    className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    Ho ricordato bene
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeQuizModal}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Chiudi
+                </button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

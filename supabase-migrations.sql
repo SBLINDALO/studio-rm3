@@ -10,9 +10,12 @@ CREATE TABLE IF NOT EXISTS user_progress (
   review_status TEXT CHECK (review_status IN ('review')),
   confidence INTEGER,
   note TEXT,
+  notes_data JSONB DEFAULT '{}'::JSONB,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, subject_key, topic_index)
 );
+
+ALTER TABLE IF EXISTS user_progress ADD COLUMN IF NOT EXISTS notes_data JSONB DEFAULT '{}'::JSONB;
 
 -- Tabella per le sessioni giornaliere completate
 CREATE TABLE IF NOT EXISTS user_daily (

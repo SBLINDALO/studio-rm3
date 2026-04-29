@@ -28,6 +28,7 @@ export default function PlannerPage() {
     data,
     loaded,
     toggleTopic,
+    saveTopicQuiz,
     toggleDaily,
     setNote,
     setCheck,
@@ -407,7 +408,7 @@ export default function PlannerPage() {
               />
             )}
             {tab === "tracker" && (
-              <TrackerTab data={data} toggleTopic={handleToggleTopic} getProgress={getProgress} />
+              <TrackerTab data={data} quiz={data.quiz} toggleTopic={handleToggleTopic} saveTopicQuiz={saveTopicQuiz} getProgress={getProgress} />
             )}
             {tab === "review" && (
               <ReviewTab data={data} setCheck={setCheck} setConf={setConf} setNote={setNote} />

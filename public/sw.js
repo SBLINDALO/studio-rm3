@@ -117,6 +117,55 @@ async function staleWhileRevalidate(req) {
 }
 
 // ─── Messaging: permette all'app di forzare un aggiornamento ───────────────
+const notificationTimers = new Map()
+
+function clearNotificationTimers() {
+  notificationTimers.forEach((timerId) => clearTimeout(timerId))
+  notificationTimers.clear()
+}
+
+function scheduleNotification({ id, time, title, body, tag }) {
+  const delay = time - Date.now()
+  if (delay <= 0) return
+
+  const timerId = setTimeout(() => {
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon.svg",
+      badge: "/icon-light-32x32.png",
+      tag: tag || id,
+      renotify: true,
+    })
+    notificationTimers.delete(id)
+  }, delay)
+
+  notificationTimers.set(id, timerId)
+}
+
 self.addEventListener("message", (event) => {
-  if (event.data?.type === "SKIP_WAITING") self.skipWaiting()
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting()
+    return
+  }
+
+  if (event.data?.type === "SCHEDULE_NOTIFICATIONS") {
+    clearNotificationTimers()
+    const payload = event.data.payload
+    if (Array.isArray(payload?.notifications)) {
+      payload.notifications.forEach((entry) => scheduleNotification(entry))
+    }
+    return
+  }
+})
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close()
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      if (clients.length > 0) {
+        return clients[0].focus()
+      }
+      return self.clients.openWindow("/")
+    }),
+  )
 })

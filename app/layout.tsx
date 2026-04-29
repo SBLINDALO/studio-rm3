@@ -5,6 +5,7 @@ import './globals.css'
 import { Geist, Geist_Mono, Geist as V0_Font_Geist, Geist_Mono as V0_Font_Geist_Mono, Source_Serif_4 as V0_Font_Source_Serif_4 } from 'next/font/google'
 
 import { ServiceWorkerRegister } from '@/components/pwa/service-worker-register'
+import { BrowserNotifications } from '@/components/pwa/browser-notifications'
 import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { OfflineIndicator } from '@/components/pwa/offline-indicator'
 
@@ -80,6 +81,7 @@ export default function RootLayout({
         {children}
         <InstallPrompt />
         <ServiceWorkerRegister />
+        <BrowserNotifications />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

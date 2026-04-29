@@ -15,13 +15,14 @@ const initialData: PlannerData = {
   check: {},
   sessions: [],
   catchup: [],
+  quiz: {},
   dismissedSkips: {},
 }
 
 export function usePlanner() {
   const [data, setData] = useState<PlannerData>(initialData)
   const [loaded, setLoaded] = useState(false)
-  const { syncTopic, loadProgressFromSupabase, syncDaily, syncNote, syncConf, syncCheck, syncSession, syncCatchup, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase, loadCatchupFromSupabase } = useSupabaseSync()
+  const { syncTopic, syncTopicQuiz, loadProgressFromSupabase, syncDaily, syncNote, syncConf, syncCheck, syncSession, syncCatchup, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase, loadCatchupFromSupabase } = useSupabaseSync()
 
   useEffect(() => {
     const loadData = async () => {
@@ -37,6 +38,7 @@ export function usePlanner() {
           if (!parsed.conf) parsed.conf = {}
           if (!parsed.check) parsed.check = {}
           if (!parsed.catchup) parsed.catchup = []
+          if (!parsed.quiz) parsed.quiz = {}
           if (!parsed.dismissedSkips) parsed.dismissedSkips = {}
         }
 
@@ -53,11 +55,25 @@ export function usePlanner() {
 
         // Unisci topics
         const mergedTopics = { ...parsed.topics }
+        const mergedQuiz = { ...parsed.quiz }
         for (const [key, progress] of Object.entries(supabaseProgress)) {
           const status: TopicStatus = progress.is_completed ? "done" : progress.review_status === "review" ? "review" : null
           mergedTopics[key] = status
+
+          if (!mergedQuiz[key] && progress.notes_data?.questions?.length) {
+            mergedQuiz[key] = {
+              questions: Array.isArray(progress.notes_data.questions)
+                ? progress.notes_data.questions.map((question: any) => ({
+                    id: question.id || `${key}-${Math.random().toString(36).slice(2, 8)}`,
+                    question: question.question ?? "",
+                    answer: question.answer ?? "",
+                  }))
+                : [],
+            }
+          }
         }
         parsed.topics = mergedTopics
+        parsed.quiz = mergedQuiz
 
         // Unisci daily
         parsed.daily = { ...parsed.daily, ...supabaseDaily }
@@ -113,9 +129,16 @@ export function usePlanner() {
         syncTopic(sub, i, status).catch(() => {
           // Fallback già gestito in useSupabaseSync
         })
+
+        const quizData = data.quiz[k]
+        if (quizData?.questions?.length) {
+          syncTopicQuiz(sub, i, quizData).catch(() => {
+            // Fallback già gestito in useSupabaseSync
+          })
+        }
       }
     },
-    [data, save, syncTopic],
+    [data, save, syncTopic, syncTopicQuiz],
   )
 
   const toggleDaily = useCallback(
@@ -179,6 +202,24 @@ export function usePlanner() {
       })
     },
     [data, save, syncSession],
+  )
+
+  const saveTopicQuiz = useCallback(
+    (sub: SubjectKey, i: number, quizEntry: { questions: { id: string; question: string; answer: string }[] }) => {
+      const key = `${sub}_${i}`
+      const nextQuiz = { ...data.quiz }
+      if (quizEntry.questions.length) {
+        nextQuiz[key] = quizEntry
+      } else {
+        delete nextQuiz[key]
+      }
+      save({ ...data, quiz: nextQuiz })
+
+      syncTopicQuiz(sub, i, quizEntry).catch(() => {
+        // Fallback già gestito in useSupabaseSync
+      })
+    },
+    [data, save, syncTopicQuiz],
   )
 
   const getProgress = useCallback(
@@ -282,6 +323,7 @@ export function usePlanner() {
     loaded,
     save,
     toggleTopic,
+    saveTopicQuiz,
     toggleDaily,
     setNote,
     setCheck,

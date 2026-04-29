@@ -2,6 +2,16 @@ export type SubjectKey = "psico" | "radio" | "est" | "scog" | "genere"
 export type TimerMode = "focus" | "break"
 export type TopicStatus = "done" | "review" | null
 
+export interface ActiveRecallQuestion {
+  id: string
+  question: string
+  answer: string
+}
+
+export interface QuizEntry {
+  questions: ActiveRecallQuestion[]
+}
+
 export interface Subject {
   name: string
   short: string

@@ -78,6 +78,50 @@ export function useSupabaseSync() {
     [isOnline]
   )
 
+  const syncTopicQuiz = useCallback(
+    async (subject: SubjectKey, topicIndex: number, notesData: { questions: { id: string; question: string; answer: string }[] }) => {
+      if (!isOnline) {
+        saveTopicQuizToLocalStorage(subject, topicIndex, notesData)
+        return
+      }
+
+      try {
+        setSyncStatus("syncing")
+
+        const { data: user } = await supabase.auth.getUser()
+
+        if (!user.user) {
+          saveTopicQuizToLocalStorage(subject, topicIndex, notesData)
+          setSyncStatus("idle")
+          return
+        }
+
+        const { error } = await supabase.from("user_progress").upsert(
+          {
+            user_id: user.user.id,
+            subject_key: subject,
+            topic_index: topicIndex,
+            notes_data: notesData,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id, subject_key, topic_index" }
+        )
+
+        if (error) {
+          console.warn("Supabase quiz sync error, fallback to localStorage:", error)
+          saveTopicQuizToLocalStorage(subject, topicIndex, notesData)
+        }
+
+        setSyncStatus("idle")
+      } catch (err) {
+        console.error("Quiz sync error:", err)
+        saveTopicQuizToLocalStorage(subject, topicIndex, notesData)
+        setSyncStatus("error")
+      }
+    },
+    [isOnline]
+  )
+
   /**
    * Carica i progressi da Supabase (da eseguire all'avvio)
    */
@@ -628,6 +672,7 @@ export function useSupabaseSync() {
 
   return {
     syncTopic,
+    syncTopicQuiz,
     loadProgressFromSupabase,
     syncDaily,
     syncNote,
@@ -656,6 +701,18 @@ function saveToLocalStorage(subject: SubjectKey, topicIndex: number, status: "do
     const key = `${subject}_${topicIndex}`
     data[key] = { status, timestamp: new Date().toISOString() }
     localStorage.setItem("planner.sync.backup", JSON.stringify(data))
+  } catch {
+    // Silently fail
+  }
+}
+
+function saveTopicQuizToLocalStorage(subject: SubjectKey, topicIndex: number, notesData: { questions: { id: string; question: string; answer: string }[] }) {
+  try {
+    const storage = localStorage.getItem("planner.quiz.backup") || "{}"
+    const data = JSON.parse(storage)
+    const key = `${subject}_${topicIndex}`
+    data[key] = { notesData, timestamp: new Date().toISOString() }
+    localStorage.setItem("planner.quiz.backup", JSON.stringify(data))
   } catch {
     // Silently fail
   }
