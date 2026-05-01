@@ -41,6 +41,8 @@ export default function PlannerPage() {
     addCatchupItems,
     toggleCatchupDone,
     removeCatchupItem,
+    attachDoc,
+    removeDoc,
   } = usePlanner()
 
   const [tab, setTab] = usePersistedState<TabId>("ui.tab", "today")
@@ -392,6 +394,8 @@ export default function PlannerPage() {
                 data={data}
                 toggleDaily={handleToggleDaily}
                 toggleCatchupDone={toggleCatchupDone}
+                attachDoc={attachDoc}
+                removeDoc={removeDoc}
                 todayFocusMin={todayFocusMin}
                 todayFocusCount={todayFocusCount}
                 skippedCount={skippedItems.length}
@@ -404,6 +408,8 @@ export default function PlannerPage() {
                 data={data}
                 toggleDaily={handleToggleDaily}
                 toggleCatchupDone={toggleCatchupDone}
+                attachDoc={attachDoc}
+                removeDoc={removeDoc}
                 skippedByDay={skippedByDay}
               />
             )}

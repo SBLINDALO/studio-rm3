@@ -114,6 +114,15 @@ export interface DayItem {
   origDay?: string
 }
 
+export interface StudyDoc {
+  url: string
+  dataUrl?: string
+  name: string
+  type: "pdf" | "image" | "text" | "url" | "file"
+  size?: number
+  addedAt: number
+}
+
 export interface PlannerData {
   topics: Record<string, TopicStatus>
   daily: Record<string, boolean>
@@ -123,4 +132,5 @@ export interface PlannerData {
   sessions: LoggedSession[]
   catchup: CatchupItem[]
   dismissedSkips: Record<string, true>
+  docs: Record<string, StudyDoc>
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { CatchupItem, PlannerData, SubjectKey, TopicStatus, LoggedSession } from "@/lib/planner/types"
+import type { CatchupItem, PlannerData, SubjectKey, TopicStatus, LoggedSession, StudyDoc } from "@/lib/planner/types"
 import { SUBJECTS, TOPICS, TODAY_STR } from "@/lib/planner/data"
 import { useSupabaseSync } from "./use-supabase-sync"
 
@@ -17,6 +17,7 @@ const initialData: PlannerData = {
   catchup: [],
   quiz: {},
   dismissedSkips: {},
+  docs: {},
 }
 
 export function usePlanner() {
@@ -40,6 +41,7 @@ export function usePlanner() {
           if (!parsed.catchup) parsed.catchup = []
           if (!parsed.quiz) parsed.quiz = {}
           if (!parsed.dismissedSkips) parsed.dismissedSkips = {}
+          if (!parsed.docs) parsed.docs = {}
         }
 
         // Carica tutti i dati da Supabase e unisci
@@ -318,6 +320,22 @@ export function usePlanner() {
     [data, save],
   )
 
+  const attachDoc = useCallback(
+    (key: string, doc: StudyDoc) => {
+      save({ ...data, docs: { ...data.docs, [key]: doc } })
+    },
+    [data, save],
+  )
+
+  const removeDoc = useCallback(
+    (key: string) => {
+      const nextDocs = { ...data.docs }
+      delete nextDocs[key]
+      save({ ...data, docs: nextDocs })
+    },
+    [data, save],
+  )
+
   return {
     data,
     loaded,
@@ -337,5 +355,7 @@ export function usePlanner() {
     addCatchupItems,
     toggleCatchupDone,
     removeCatchupItem,
+    attachDoc,
+    removeDoc,
   }
 }

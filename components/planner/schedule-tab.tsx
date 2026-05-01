@@ -5,17 +5,20 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ChevronDown, GraduationCap, BookOpen, RotateCw, MapPin, X, Check } from "lucide-react"
 import { WEEKS, DAILY, C, SUBJECTS, PHASE_COLOR, TODAY_STR } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
+import { StudyDocViewer } from "./study-doc-viewer"
 import { getCatchupCountForDay, getDayItems } from "@/lib/planner/catchup"
-import type { PlannerData, SubjectKey } from "@/lib/planner/types"
+import type { PlannerData, SubjectKey, StudyDoc } from "@/lib/planner/types"
 
 interface Props {
   data: PlannerData
   toggleDaily: (day: string, ti: number) => void
   toggleCatchupDone: (id: string) => void
+  attachDoc: (key: string, doc: StudyDoc) => void
+  removeDoc: (key: string) => void
   skippedByDay: Record<string, number>
 }
 
-export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, skippedByDay }: Props) {
+export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, removeDoc, skippedByDay }: Props) {
   const [openWeek, setOpenWeek] = useState<number>(0)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const allStudyDays = Object.keys(DAILY).sort()
@@ -248,15 +251,11 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, skippedByDay
                                   {dayItems.map((s) => {
                                     const done = s.done
                                     const isCatchup = s.kind === "catchup"
+                                    const docKey = isCatchup ? s.catchupId! : `${dayStr}_${s.plannedIdx!}`
                                     return (
-                                      <motion.button
+                                      <motion.div
                                         key={isCatchup ? `c_${s.catchupId}` : `p_${s.plannedIdx}`}
-                                        whileTap={{ scale: 0.99 }}
-                                        onClick={() => {
-                                          if (isCatchup && s.catchupId) toggleCatchupDone(s.catchupId)
-                                          else if (s.plannedIdx !== undefined) toggleDaily(dayStr, s.plannedIdx)
-                                        }}
-                                        className="relative flex w-full items-start gap-2 overflow-hidden rounded-lg border border-[var(--border-subtle)] p-2.5 text-left transition-colors"
+                                        className="relative overflow-hidden rounded-lg border border-[var(--border-subtle)] p-2.5 text-left transition-colors"
                                         style={{
                                           background: done
                                             ? "#F0FDF4"
@@ -267,49 +266,64 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, skippedByDay
                                           borderLeftColor: C[s.sub].dot,
                                         }}
                                       >
-                                        <span
-                                          className={`mt-0.5 flex h-4.5 w-4.5 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
-                                            done
-                                              ? "bg-emerald-500"
-                                              : "border border-stone-300 bg-white"
-                                          }`}
-                                          style={{ width: 18, height: 18 }}
+                                        <button
+                                          onClick={() => {
+                                            if (isCatchup && s.catchupId) toggleCatchupDone(s.catchupId)
+                                            else if (s.plannedIdx !== undefined) toggleDaily(dayStr, s.plannedIdx)
+                                          }}
+                                          className="flex w-full items-start gap-2 text-left"
                                         >
-                                          {done && (
-                                            <Check size={10} className="text-white" strokeWidth={3} />
-                                          )}
-                                        </span>
-                                        <span className="flex-1 min-w-0">
                                           <span
-                                            className="flex flex-wrap items-center gap-1 text-[10px] font-medium"
-                                            style={{ color: C[s.sub].text }}
-                                          >
-                                            <SubjectIcon sub={s.sub} size={10} strokeWidth={2} />
-                                            <span>{SUBJECTS[s.sub].short}</span>
-                                            <span className="text-stone-400">· {s.dur}</span>
-                                            {isCatchup && (
-                                              <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[8.5px] font-medium uppercase tracking-wider text-amber-800">
-                                                <RotateCw size={7} strokeWidth={2.5} />
-                                                Recupero
-                                              </span>
-                                            )}
-                                          </span>
-                                          <span
-                                            className={`mt-0.5 block text-[11.5px] leading-snug ${
+                                            className={`mt-0.5 flex h-4.5 w-4.5 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
                                               done
-                                                ? "text-stone-400 line-through"
-                                                : "text-stone-700"
+                                                ? "bg-emerald-500"
+                                                : "border border-stone-300 bg-white"
                                             }`}
+                                            style={{ width: 18, height: 18 }}
                                           >
-                                            {s.topic}
-                                            {isCatchup && s.origDay && (
-                                              <span className="ml-1.5 text-[10px] text-amber-700">
-                                                ↺ da {DAILY[s.origDay]?.label ?? s.origDay}
-                                              </span>
+                                            {done && (
+                                              <Check size={10} className="text-white" strokeWidth={3} />
                                             )}
                                           </span>
-                                        </span>
-                                      </motion.button>
+                                          <span className="flex-1 min-w-0">
+                                            <span
+                                              className="flex flex-wrap items-center gap-1 text-[10px] font-medium"
+                                              style={{ color: C[s.sub].text }}
+                                            >
+                                              <SubjectIcon sub={s.sub} size={10} strokeWidth={2} />
+                                              <span>{SUBJECTS[s.sub].short}</span>
+                                              <span className="text-stone-400">· {s.dur}</span>
+                                              {isCatchup && (
+                                                <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[8.5px] font-medium uppercase tracking-wider text-amber-800">
+                                                  <RotateCw size={7} strokeWidth={2.5} />
+                                                  Recupero
+                                                </span>
+                                              )}
+                                            </span>
+                                            <span
+                                              className={`mt-0.5 block text-[11.5px] leading-snug ${
+                                                done
+                                                  ? "text-stone-400 line-through"
+                                                  : "text-stone-700"
+                                              }`}
+                                            >
+                                              {s.topic}
+                                              {isCatchup && s.origDay && (
+                                                <span className="ml-1.5 text-[10px] text-amber-700">
+                                                  ↺ da {DAILY[s.origDay]?.label ?? s.origDay}
+                                                </span>
+                                              )}
+                                            </span>
+                                          </span>
+                                        </button>
+                                        <StudyDocViewer
+                                          sessionKey={docKey}
+                                          sub={s.sub}
+                                          doc={data.docs?.[docKey]}
+                                          onAttach={attachDoc}
+                                          onRemove={removeDoc}
+                                        />
+                                      </motion.div>
                                     )
                                   })}
                                 </div>

@@ -5,15 +5,18 @@ import { Check, CalendarClock, Timer as TimerIcon, CheckCircle2, RotateCw, Arrow
 import { SUBJECTS, C, TODAY_STR, BOOKINGS } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
 import { SkippedBanner } from "./skipped-banner"
+import { StudyDocViewer } from "./study-doc-viewer"
 import { daysUntil, fmtDuration } from "@/lib/planner/helpers"
 import { getDayItems } from "@/lib/planner/catchup"
-import type { SubjectKey, PlannerData } from "@/lib/planner/types"
+import type { SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
 import type { TabId } from "./tabs-nav"
 
 interface Props {
   data: PlannerData
   toggleDaily: (day: string, ti: number) => void
   toggleCatchupDone: (id: string) => void
+  attachDoc: (key: string, doc: StudyDoc) => void
+  removeDoc: (key: string) => void
   todayFocusMin: number
   todayFocusCount: number
   skippedCount: number
@@ -25,6 +28,8 @@ export function TodayTab({
   data,
   toggleDaily,
   toggleCatchupDone,
+  attachDoc,
+  removeDoc,
   todayFocusMin,
   todayFocusCount,
   skippedCount,
@@ -123,62 +128,73 @@ export function TodayTab({
           {items.map((task, i) => {
             const done = task.done
             const isCatchup = task.kind === "catchup"
+            const docKey = isCatchup ? task.catchupId! : `${TODAY_STR}_${task.plannedIdx!}`
             return (
-              <motion.button
+              <motion.div
                 key={isCatchup ? `c_${task.catchupId}` : `p_${task.plannedIdx}`}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
-                whileTap={{ scale: 0.99 }}
-                onClick={() => {
-                  if (isCatchup && task.catchupId) toggleCatchupDone(task.catchupId)
-                  else if (task.plannedIdx !== undefined) toggleDaily(TODAY_STR, task.plannedIdx)
-                }}
-                className="card-quiet card-quiet-hover relative flex w-full items-start gap-3 overflow-hidden p-3 text-left"
+                className="card-quiet card-quiet-hover relative flex w-full items-start gap-3 overflow-hidden p-3"
               >
                 <div
                   className="absolute left-0 top-0 h-full w-[3px]"
                   style={{ background: C[task.sub].dot }}
                   aria-hidden
                 />
-                <span
-                  className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
-                    done
-                      ? "bg-emerald-500"
-                      : "border-[1.5px] border-stone-300 bg-white"
-                  }`}
-                  aria-hidden
+                <button
+                  onClick={() => {
+                    if (isCatchup && task.catchupId) toggleCatchupDone(task.catchupId)
+                    else if (task.plannedIdx !== undefined) toggleDaily(TODAY_STR, task.plannedIdx)
+                  }}
+                  className="flex items-start gap-3 text-left flex-1 min-w-0"
                 >
-                  {done && <Check size={12} className="text-white" strokeWidth={3} />}
-                </span>
-
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium">
-                    <span
-                      className="flex items-center gap-1"
-                      style={{ color: C[task.sub].text }}
-                    >
-                      <SubjectIcon sub={task.sub} size={11} strokeWidth={1.75} />
-                      {SUBJECTS[task.sub].short}
-                    </span>
-                    <span className="text-stone-400">·</span>
-                    <span className="text-stone-500">{task.dur}</span>
-                    {isCatchup && (
-                      <span className="ml-1 inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-amber-800">
-                        <RotateCw size={8} strokeWidth={2.5} />
-                        Recupero
-                      </span>
-                    )}
-                  </span>
                   <span
-                    className={`mt-1 block text-[13px] leading-snug ${
-                      done ? "text-stone-400 line-through" : "text-stone-800"
+                    className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
+                      done
+                        ? "bg-emerald-500"
+                        : "border-[1.5px] border-stone-300 bg-white"
                     }`}
+                    aria-hidden
                   >
-                    {task.topic}
+                    {done && <Check size={12} className="text-white" strokeWidth={3} />}
                   </span>
-                </span>
-              </motion.button>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium">
+                      <span
+                        className="flex items-center gap-1"
+                        style={{ color: C[task.sub].text }}
+                      >
+                        <SubjectIcon sub={task.sub} size={11} strokeWidth={1.75} />
+                        {SUBJECTS[task.sub].short}
+                      </span>
+                      <span className="text-stone-400">·</span>
+                      <span className="text-stone-500">{task.dur}</span>
+                      {isCatchup && (
+                        <span className="ml-1 inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-amber-800">
+                          <RotateCw size={8} strokeWidth={2.5} />
+                          Recupero
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={`mt-1 block text-[13px] leading-snug ${
+                        done ? "text-stone-400 line-through" : "text-stone-800"
+                      }`}
+                    >
+                      {task.topic}
+                    </span>
+                  </span>
+                </button>
+                <StudyDocViewer
+                  sessionKey={docKey}
+                  sub={task.sub}
+                  doc={data.docs?.[docKey]}
+                  onAttach={attachDoc}
+                  onRemove={removeDoc}
+                />
+              </motion.div>
             )
           })}
         </div>

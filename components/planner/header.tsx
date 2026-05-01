@@ -172,10 +172,19 @@ export function Header({
           className="group relative mt-3 cursor-pointer overflow-hidden rounded-full border border-white/15 bg-stone-900/10 p-2"
           aria-expanded={expanded}
         >
-          <div
+          <motion.div
             className="absolute inset-0 rounded-full"
-            style={{
-              boxShadow: `0 0 24px 4px ${glowColor}22`,
+            animate={{
+              boxShadow: [
+                `0 0 24px 4px ${glowColor}22`,
+                `0 0 32px 8px ${glowColor}44`,
+                `0 0 24px 4px ${glowColor}22`,
+              ],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
             }}
           />
           <div className="relative h-3 overflow-hidden rounded-full bg-stone-900/10">
