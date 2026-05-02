@@ -20,7 +20,8 @@ import { FocusView } from "@/components/planner/focus-view"
 import { CatchupView } from "@/components/planner/catchup-view"
 import { AssistantFab } from "@/components/planner/assistant-fab"
 import { AssistantDrawer } from "@/components/planner/assistant-drawer"
-import { Toast, type ToastState } from "@/components/planner/toast"
+import { ProgressTab } from "@/components/planner/progress-tab"
+import { NotificationSettings } from "@/components/planner/notification-settings"
 import { scanSkipped } from "@/lib/planner/catchup"
 
 export default function PlannerPage() {
@@ -43,12 +44,20 @@ export default function PlannerPage() {
     removeCatchupItem,
     attachDoc,
     removeDoc,
+    addCustomExam,
+    removeExam,
+    archiveExam,
+    restoreExam,
+    updateChapterProgress,
+    dailyStats,
+    streak,
   } = usePlanner()
 
   const [tab, setTab] = usePersistedState<TabId>("ui.tab", "today")
   const [toast, setToast] = useState<ToastState | null>(null)
   const [catchupOpen, setCatchupOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const skippedNotifiedRef = useRef(false)
 
   // Timer state
@@ -371,12 +380,18 @@ export default function PlannerPage() {
 
       <Toast toast={toast} />
 
+      <NotificationSettings
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+
       <Header
         globalPct={gp.pct}
         globalDone={gp.done}
         globalTotal={gp.total}
         skippedCount={skippedItems.length}
         onOpenCatchup={() => setCatchupOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
         getProgress={getProgress}
       />
 
@@ -396,6 +411,13 @@ export default function PlannerPage() {
                 toggleCatchupDone={toggleCatchupDone}
                 attachDoc={attachDoc}
                 removeDoc={removeDoc}
+                addCustomExam={addCustomExam}
+                archiveExam={archiveExam}
+                removeExam={removeExam}
+                restoreExam={restoreExam}
+                updateChapterProgress={updateChapterProgress}
+                dailyStats={dailyStats}
+                streak={streak}
                 todayFocusMin={todayFocusMin}
                 todayFocusCount={todayFocusCount}
                 skippedCount={skippedItems.length}
@@ -418,6 +440,9 @@ export default function PlannerPage() {
             )}
             {tab === "review" && (
               <ReviewTab data={data} setCheck={setCheck} setConf={setConf} setNote={setNote} />
+            )}
+            {tab === "progress" && (
+              <ProgressTab data={data} dailyStats={dailyStats} streak={streak} />
             )}
             {tab === "timer" && (
               <TimerTab

@@ -1,9 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { CatchupItem, PlannerData, SubjectKey, TopicStatus, LoggedSession, StudyDoc } from "@/lib/planner/types"
+import type { ArchivedExam, CatchupItem, CustomExam, PlannerData, SubjectKey, TopicStatus, LoggedSession, StudyDoc } from "@/lib/planner/types"
 import { SUBJECTS, TOPICS, TODAY_STR } from "@/lib/planner/data"
 import { useSupabaseSync } from "./use-supabase-sync"
+import { getAllExams, addCustomExam as addExamToSupabase, removeExam as removeExamFromSupabase, archiveExam as archiveExamToSupabase, restoreExam as restoreExamFromSupabase } from "@/lib/supabase/exams"
+import { getStudyProgress, updateChapterProgress, getDailyStats, getStreak } from "@/lib/supabase/study-progress"
+import type { StudyProgress } from "@/lib/supabase/client"
 
 const STORAGE_KEY = "planner5v3"
 
@@ -18,11 +21,15 @@ const initialData: PlannerData = {
   quiz: {},
   dismissedSkips: {},
   docs: {},
+  // customExams e archivedExams sono gestiti da Supabase
+  studyProgress: [],
 }
 
 export function usePlanner() {
   const [data, setData] = useState<PlannerData>(initialData)
   const [loaded, setLoaded] = useState(false)
+  const [dailyStats, setDailyStats] = useState({ chaptersCompleted: 0, totalTimeSpent: 0, examsStudied: [] as string[] })
+  const [streak, setStreak] = useState(0)
   const { syncTopic, syncTopicQuiz, loadProgressFromSupabase, syncDaily, syncNote, syncConf, syncCheck, syncSession, syncCatchup, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase, loadCatchupFromSupabase } = useSupabaseSync()
 
   useEffect(() => {
@@ -42,6 +49,7 @@ export function usePlanner() {
           if (!parsed.quiz) parsed.quiz = {}
           if (!parsed.dismissedSkips) parsed.dismissedSkips = {}
           if (!parsed.docs) parsed.docs = {}
+          // Non caricare customExams e archivedExams da localStorage
         }
 
         // Carica tutti i dati da Supabase e unisci
@@ -99,19 +107,61 @@ export function usePlanner() {
         const newCatchup = supabaseCatchup.filter(c => !existingCatchupIds.has(c.id))
         parsed.catchup = [...parsed.catchup, ...newCatchup]
 
+        // Carica esami da Supabase
+        const userId = "test-user"
+        try {
+          const { customExams, archivedExams } = await getAllExams(userId)
+          parsed.customExams = customExams
+          parsed.archivedExams = archivedExams
+        } catch (examError) {
+          console.error('Error loading exams from Supabase:', examError)
+          // Imposta valori di default se Supabase fallisce
+          parsed.customExams = []
+          parsed.archivedExams = []
+        }
+
+        // Carica study progress da Supabase
+        try {
+          // Per ora, carica tutto; in futuro, filtra per esami attivi
+          const allProgress: StudyProgress[] = []
+          for (const exam of parsed.customExams) {
+            const progress = await getStudyProgress(userId, exam.id)
+            allProgress.push(...progress)
+          }
+          parsed.studyProgress = allProgress
+        } catch (progressError) {
+          console.error('Error loading study progress:', progressError)
+          parsed.studyProgress = []
+        }
+
         setData(parsed)
-      } catch {
-        // ignore
+        setLoaded(true)
+
+        // Calcola statistiche giornaliere e streak
+        try {
+          const [stats, streakValue] = await Promise.all([
+            getDailyStats(userId, TODAY_STR),
+            getStreak(userId)
+          ])
+          setDailyStats(stats)
+          setStreak(streakValue)
+        } catch (statsError) {
+          console.error('Error loading stats:', statsError)
+        }
+      } catch (error) {
+        console.error('Error loading data:', error)
+        setLoaded(true)
       }
-      setLoaded(true)
     }
     loadData()
   }, [loadProgressFromSupabase, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase, loadCatchupFromSupabase])
 
   const save = useCallback((next: PlannerData) => {
+    // Non salvare customExams e archivedExams su localStorage, sono gestiti da Supabase
+    const { customExams, archivedExams, ...dataToSave } = next
     setData(next)
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
     } catch {
       // ignore
     }
@@ -204,6 +254,108 @@ export function usePlanner() {
       })
     },
     [data, save, syncSession],
+  )
+
+  const addCustomExam = useCallback(
+    async (exam: Omit<CustomExam, 'id' | 'createdAt'>) => {
+      try {
+        const userId = "test-user"
+        const updatedCustomExams = await addExamToSupabase(exam, userId)
+        setData(prev => ({ ...prev, customExams: updatedCustomExams }))
+      } catch (error) {
+        console.error('Error adding custom exam:', error)
+      }
+    },
+    [],
+  )
+
+  const cleanExamDocs = useCallback(
+    (id: string) => {
+      const nextDocs = { ...data.docs }
+      Object.keys(nextDocs).forEach((key) => {
+        if (key.startsWith(`exam_${id}`)) {
+          delete nextDocs[key]
+        }
+      })
+      return nextDocs
+    },
+    [data.docs],
+  )
+
+  const removeExam = useCallback(
+    async (id: string) => {
+      try {
+        const userId = "test-user"
+        const { customExams, archivedExams } = await removeExamFromSupabase(id, userId)
+        setData(prev => ({
+          ...prev,
+          customExams,
+          archivedExams,
+          docs: cleanExamDocs(id),
+        }))
+      } catch (error) {
+        console.error('Error removing exam:', error)
+      }
+    },
+    [cleanExamDocs],
+  )
+
+  const archiveExam = useCallback(
+    async (id: string) => {
+      try {
+        const userId = "test-user"
+        const { customExams, archivedExams } = await archiveExamToSupabase(id, userId)
+        setData(prev => ({
+          ...prev,
+          customExams,
+          archivedExams,
+          docs: cleanExamDocs(id),
+        }))
+      } catch (error) {
+        console.error('Error archiving exam:', error)
+      }
+    },
+    [cleanExamDocs],
+  )
+
+  const restoreExam = useCallback(
+    async (id: string) => {
+      try {
+        const userId = "test-user"
+        const { customExams, archivedExams } = await restoreExamFromSupabase(id, userId)
+        setData(prev => ({
+          ...prev,
+          customExams,
+          archivedExams,
+        }))
+      } catch (error) {
+        console.error('Error restoring exam:', error)
+      }
+    },
+    [],
+  )
+
+  const updateChapterProgress = useCallback(
+    async (examId: string, chapterId: string, status: "not_started" | "in_progress" | "completed", timeSpent?: number) => {
+      try {
+        const userId = "test-user"
+        const updatedProgress = await updateChapterProgress(userId, examId, chapterId, status, timeSpent)
+        setData(prev => ({
+          ...prev,
+          studyProgress: prev.studyProgress.map(p => p.id === updatedProgress.id ? updatedProgress : p)
+        }))
+        // Ricarica statistiche
+        const [stats, streakValue] = await Promise.all([
+          getDailyStats(userId, TODAY_STR),
+          getStreak(userId)
+        ])
+        setDailyStats(stats)
+        setStreak(streakValue)
+      } catch (error) {
+        console.error('Error updating chapter progress:', error)
+      }
+    },
+    [],
   )
 
   const saveTopicQuiz = useCallback(
@@ -357,5 +509,12 @@ export function usePlanner() {
     removeCatchupItem,
     attachDoc,
     removeDoc,
+    addCustomExam,
+    removeExam,
+    archiveExam,
+    restoreExam,
+    updateChapterProgress,
+    dailyStats,
+    streak,
   }
 }

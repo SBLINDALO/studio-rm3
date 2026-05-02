@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { TrendingUp, GraduationCap, AlertTriangle } from "lucide-react"
+import { TrendingUp, GraduationCap, AlertTriangle, Settings } from "lucide-react"
 import { SUBJECTS, C } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
 import type { SubjectKey } from "@/lib/planner/types"
@@ -21,6 +21,7 @@ interface Props {
   globalTotal: number
   skippedCount: number
   onOpenCatchup: () => void
+  onOpenSettings: () => void
   getProgress: (sub: SubjectKey) => { done: number; total: number; pct: number }
 }
 
@@ -30,6 +31,7 @@ export function Header({
   globalTotal,
   skippedCount,
   onOpenCatchup,
+  onOpenSettings,
   getProgress,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
@@ -144,6 +146,15 @@ export function Header({
             </motion.button>
           )}
         </AnimatePresence>
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={onOpenSettings}
+          className="group relative mt-0.5 flex flex-shrink-0 items-center gap-1.5 rounded-full border bg-white/10 px-3 py-1.5 text-[11px] font-medium text-white shadow-sm transition-all hover:bg-white/15 hover:shadow"
+          aria-label="Impostazioni notifiche"
+        >
+          <Settings size={12} strokeWidth={2.25} />
+        </motion.button>
       </div>
 
       {/* Progress card */}

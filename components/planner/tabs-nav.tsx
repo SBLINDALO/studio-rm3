@@ -1,9 +1,9 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { LayoutDashboard, Calendar, CheckCircle2, ClipboardList, Timer } from "lucide-react"
+import { LayoutDashboard, Calendar, CheckCircle2, ClipboardList, Timer, BarChart3 } from "lucide-react"
 
-export type TabId = "today" | "schedule" | "tracker" | "review" | "timer"
+export type TabId = "today" | "schedule" | "tracker" | "review" | "timer" | "progress"
 
 const TABS: { id: TabId; label: string; Icon: typeof LayoutDashboard }[] = [
   { id: "today", label: "Oggi", Icon: LayoutDashboard },
@@ -11,6 +11,7 @@ const TABS: { id: TabId; label: string; Icon: typeof LayoutDashboard }[] = [
   { id: "tracker", label: "Tracker", Icon: CheckCircle2 },
   { id: "review", label: "Verifica", Icon: ClipboardList },
   { id: "timer", label: "Timer", Icon: Timer },
+  { id: "progress", label: "Progressi", Icon: BarChart3 },
 ]
 
 export function TabsNav({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {

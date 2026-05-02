@@ -1,14 +1,18 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Check, CalendarClock, Timer as TimerIcon, CheckCircle2, RotateCw, ArrowRight } from "lucide-react"
+import { Check, CalendarClock, Timer as TimerIcon, CheckCircle2, RotateCw, ArrowRight, Plus } from "lucide-react"
+import { useState } from "react"
 import { SUBJECTS, C, TODAY_STR, BOOKINGS } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
 import { SkippedBanner } from "./skipped-banner"
 import { StudyDocViewer } from "./study-doc-viewer"
 import { daysUntil, fmtDuration } from "@/lib/planner/helpers"
 import { getDayItems } from "@/lib/planner/catchup"
-import type { SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
+import { AddExamModal } from "./add-exam-modal"
+import { ExamArchive } from "./exam-archive"
+import { ExamCardMenu } from "./exam-card-menu"
+import type { ArchivedExam, CustomExam, SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
 import type { TabId } from "./tabs-nav"
 
 interface Props {
@@ -17,6 +21,13 @@ interface Props {
   toggleCatchupDone: (id: string) => void
   attachDoc: (key: string, doc: StudyDoc) => void
   removeDoc: (key: string) => void
+  addCustomExam: (exam: CustomExam) => void
+  archiveExam: (id: string) => void
+  removeExam: (id: string) => void
+  restoreExam: (id: string) => void
+  updateChapterProgress: (examId: string, chapterId: string, status: "not_started" | "in_progress" | "completed", timeSpent?: number) => void
+  dailyStats: { chaptersCompleted: number; totalTimeSpent: number; examsStudied: string[] }
+  streak: number
   todayFocusMin: number
   todayFocusCount: number
   skippedCount: number
@@ -30,13 +41,23 @@ export function TodayTab({
   toggleCatchupDone,
   attachDoc,
   removeDoc,
+  addCustomExam,
+  archiveExam,
+  removeExam,
+  restoreExam,
+  updateChapterProgress,
+  dailyStats,
+  streak,
   todayFocusMin,
   todayFocusCount,
   skippedCount,
   onOpenCatchup,
   onNavigate,
 }: Props) {
+  const [addOpen, setAddOpen] = useState(false)
   const items = getDayItems(TODAY_STR, data)
+  const customExams = data.customExams ?? []
+  const archivedExams = data.archivedExams ?? []
   const upcomingBooking = BOOKINGS.find((b) => {
     const d = daysUntil(b.date)
     return d !== null && d >= 0
@@ -72,6 +93,38 @@ export function TodayTab({
             </span>
           </div>
         )}
+      </motion.div>
+
+      {/* Daily Stats */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="card-quiet p-4"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+              Progressi oggi
+            </div>
+            <div className="mt-1 text-[14px] text-stone-700">
+              {dailyStats.chaptersCompleted} capitoli completati · {Math.round(dailyStats.totalTimeSpent / 60)} ore studiate
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[12px] text-stone-500">Streak</div>
+            <div className="text-[16px] font-semibold text-stone-900">{streak} giorni</div>
+          </div>
+        </div>
+        {/* Barra di avanzamento - per ora placeholder */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-[10px] text-stone-500 mb-1">
+            <span>Avanzamento esame</span>
+            <span>0%</span>
+          </div>
+          <div className="h-2 bg-stone-200 rounded-full">
+            <div className="h-2 bg-blue-500 rounded-full" style={{ width: '0%' }}></div>
+          </div>
+        </div>
       </motion.div>
 
       {/* Countdown grid */}
@@ -116,7 +169,68 @@ export function TodayTab({
               </motion.div>
             )
           })}
+
+          {customExams.map((exam, i) => {
+            const d = daysUntil(exam.examISO)
+            const urgent = d !== null && d <= 7
+            return (
+              <motion.div
+                key={exam.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + i * 0.04 }}
+                className="card-quiet relative overflow-hidden p-3"
+              >
+                <div
+                  className="absolute left-0 top-0 h-full w-0.5"
+                  style={{ background: exam.color.dot }}
+                  aria-hidden
+                />
+                <ExamCardMenu onArchive={() => archiveExam(exam.id)} onDelete={() => removeExam(exam.id)} />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: exam.color.text }}>
+                    {exam.short || exam.name}
+                  </div>
+                  <span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-stone-600">
+                    {exam.examType}
+                  </span>
+                </div>
+                <div
+                  className={`mt-2 text-[28px] font-semibold tabular-nums tracking-tight ${
+                    urgent ? "text-rose-600" : "text-stone-900"
+                  }`}
+                >
+                  {d ?? "—"}
+                </div>
+                <div className="text-[10px] text-stone-500">{d !== null ? `giorni · ${exam.examDate}` : exam.examDate}</div>
+                <div className="mt-1 text-[10px] text-stone-500">{exam.examTime}</div>
+              </motion.div>
+            )
+          })}
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setAddOpen(true)}
+            className="card-quiet group relative flex min-h-[150px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-stone-300 bg-white/90 px-4 py-5 text-stone-500 transition hover:border-stone-400 hover:bg-stone-50"
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-stone-200 bg-stone-100 text-stone-500">
+              <Plus size={32} />
+            </div>
+            <div className="text-sm font-semibold">Aggiungi esame</div>
+          </motion.button>
         </div>
+
+        <AddExamModal
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onAdd={addCustomExam}
+        />
+
+        {archivedExams.length > 0 && (
+          <div className="mt-4">
+            <ExamArchive archivedExams={archivedExams} onRestore={restoreExam} />
+          </div>
+        )}
       </section>
 
       {/* Today's program */}

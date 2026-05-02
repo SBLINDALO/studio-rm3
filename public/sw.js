@@ -169,3 +169,43 @@ self.addEventListener("notificationclick", (event) => {
     }),
   )
 })
+
+// ─── Push Notifications ────────────────────────────────────────────────────
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return
+
+  try {
+    const data = event.data.json()
+    const options = {
+      body: data.body,
+      icon: "/icon.svg",
+      badge: "/icon-light-32x32.png",
+      tag: data.tag || "study-reminder",
+      renotify: true,
+      data: data.data || {},
+      actions: data.actions || []
+    }
+
+    event.waitUntil(
+      self.registration.showNotification(data.title || "Promemoria Studio", options)
+    )
+  } catch (error) {
+    console.error("Error handling push event:", error)
+    event.waitUntil(
+      self.registration.showNotification("Promemoria Studio", {
+        body: "È ora di studiare!",
+        icon: "/icon.svg",
+        badge: "/icon-light-32x32.png",
+        tag: "study-reminder"
+      })
+    )
+  }
+})
+
+// ─── Push Subscription Change ──────────────────────────────────────────────
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  console.log("Push subscription changed")
+  // TODO: Handle subscription renewal if needed
+})

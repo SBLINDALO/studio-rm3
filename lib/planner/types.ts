@@ -123,6 +123,35 @@ export interface StudyDoc {
   addedAt: number
 }
 
+export interface CustomExam {
+  id: string
+  name: string
+  short: string
+  examDate: string
+  examTime: string
+  examType: "Scritto" | "Orale"
+  examISO: string
+  color: { bg: string; border: string; text: string; dot: string; soft: string }
+  material?: string
+  subjectKey?: SubjectKey
+  chapters: string[]
+  createdAt: number
+}
+
+export interface ArchivedExam {
+  id: string
+  name: string
+  short: string
+  examISO: string
+  examTime?: string
+  examType: string
+  color: { dot: string; text: string; bg: string }
+  completedAt: number
+  topicsTotal: number
+  topicsDone: number
+  completionPct: number
+}
+
 export interface PlannerData {
   topics: Record<string, TopicStatus>
   daily: Record<string, boolean>
@@ -133,4 +162,7 @@ export interface PlannerData {
   catchup: CatchupItem[]
   dismissedSkips: Record<string, true>
   docs: Record<string, StudyDoc>
+  customExams: CustomExam[]
+  archivedExams: ArchivedExam[]
+  studyProgress: StudyProgress[]
 }

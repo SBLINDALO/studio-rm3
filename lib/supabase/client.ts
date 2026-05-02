@@ -90,3 +90,48 @@ export type UserCatchup = {
   created_at: string
   updated_at: string
 }
+
+// Tipo per exams
+export type Exam = {
+  id: string
+  user_id: string
+  name: string
+  short: string
+  exam_date: string
+  exam_time: string
+  exam_type: "Scritto" | "Orale"
+  exam_iso: string
+  color_bg: string
+  color_border: string
+  color_text: string
+  color_dot: string
+  color_soft: string
+  material?: string
+  subject_key?: string // per esami fissi
+  archived: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Tipo per study_progress
+export type StudyProgress = {
+  id: string
+  user_id: string
+  exam_id: string
+  chapter_id: string
+  date: string
+  status: "not_started" | "in_progress" | "completed"
+  time_spent: number // in minuti
+  created_at: string
+  updated_at: string
+}
+
+// Tipo per push_subscriptions
+export type PushSubscription = {
+  id: string
+  user_id: string
+  subscription: any // JSON object della subscription
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
