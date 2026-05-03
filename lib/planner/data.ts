@@ -132,7 +132,9 @@ export const TOPICS: Topics = {
   ],
 }
 
-export const TODAY_STR = "2026-04-27"
+import { getTodayStr } from "./helpers"
+
+export const TODAY_STR = getTodayStr()
 export const DAILY_GOAL_MIN = 300
 
 export const WEEKS: Week[] = [

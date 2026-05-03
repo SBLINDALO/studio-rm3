@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react"
 import type { ArchivedExam, CatchupItem, CustomExam, PlannerData, SubjectKey, TopicStatus, LoggedSession, StudyDoc } from "@/lib/planner/types"
-import { SUBJECTS, TOPICS, TODAY_STR } from "@/lib/planner/data"
+import { SUBJECTS, TOPICS } from "@/lib/planner/data"
+import { getTodayStr } from "@/lib/planner/helpers"
 import { useSupabaseSync } from "./use-supabase-sync"
 import { getAllExams, addCustomExam as addExamToSupabase, removeExam as removeExamFromSupabase, archiveExam as archiveExamToSupabase, restoreExam as restoreExamFromSupabase } from "@/lib/supabase/exams"
 import { getStudyProgress, updateChapterProgress, getDailyStats, getStreak } from "@/lib/supabase/study-progress"
@@ -140,7 +141,7 @@ export function usePlanner() {
         // Calcola statistiche giornaliere e streak
         try {
           const [stats, streakValue] = await Promise.all([
-            getDailyStats(userId, TODAY_STR),
+            getDailyStats(userId, getTodayStr()),
             getStreak(userId)
           ])
           setDailyStats(stats)
@@ -245,7 +246,8 @@ export function usePlanner() {
 
   const logSession = useCallback(
     (session: Omit<LoggedSession, "id" | "date">) => {
-      const s: LoggedSession = { ...session, id: Date.now(), date: TODAY_STR }
+      const todayKey = getTodayStr()
+      const s: LoggedSession = { ...session, id: Date.now(), date: todayKey }
       save({ ...data, sessions: [...(data.sessions || []), s] })
       
       // Sincronizza con Supabase
@@ -346,7 +348,7 @@ export function usePlanner() {
         }))
         // Ricarica statistiche
         const [stats, streakValue] = await Promise.all([
-          getDailyStats(userId, TODAY_STR),
+          getDailyStats(userId, getTodayStr()),
           getStreak(userId)
         ])
         setDailyStats(stats)

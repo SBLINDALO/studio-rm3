@@ -6,7 +6,7 @@ import { RotateCw } from "lucide-react"
 
 import { usePlanner } from "@/hooks/use-planner"
 import { usePersistedState } from "@/hooks/use-persisted-state"
-import { TODAY_STR } from "@/lib/planner/data"
+import { getTodayStr } from "@/lib/planner/helpers"
 import type { SubjectKey, TimerMode } from "@/lib/planner/types"
 
 import { Header } from "@/components/planner/header"
@@ -123,9 +123,10 @@ export default function PlannerPage() {
   )
 
   // Today stats
+  const todayKey = getTodayStr()
   const todaySessions = useMemo(
-    () => (data.sessions || []).filter((s) => s.date === TODAY_STR),
-    [data.sessions],
+    () => (data.sessions || []).filter((s) => s.date === todayKey),
+    [data.sessions, todayKey],
   )
   const todayFocusMin = useMemo(
     () => todaySessions.filter((s) => s.mode === "focus").reduce((a, s) => a + s.duration, 0),

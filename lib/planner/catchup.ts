@@ -1,4 +1,5 @@
-import { DAILY, SUBJECTS, TODAY_STR } from "./data"
+import { DAILY, SUBJECTS } from "./data"
+import { getTodayStr } from "./helpers"
 import type { CatchupItem, DayItem, PlannerData, SkippedItem, SubjectKey } from "./types"
 
 /** Max sessions per day as capacity constraint for auto-rescheduling. */
@@ -11,7 +12,7 @@ const MAX_CATCHUP_PER_DAY = 2
  * Scan past days and return sessions that were planned but never marked done,
  * excluding those already rescheduled (in catchup array) or explicitly dismissed.
  */
-export function scanSkipped(data: PlannerData, effectiveToday: string = TODAY_STR): SkippedItem[] {
+export function scanSkipped(data: PlannerData, effectiveToday: string = getTodayStr()): SkippedItem[] {
   const skipped: SkippedItem[] = []
   const catchup = data.catchup ?? []
   const dismissed = data.dismissedSkips ?? {}
@@ -52,7 +53,7 @@ export function scanSkipped(data: PlannerData, effectiveToday: string = TODAY_ST
 export function proposeReschedule(
   skippedItems: SkippedItem[],
   data: PlannerData,
-  effectiveToday: string = TODAY_STR,
+  effectiveToday: string = getTodayStr(),
 ): { proposal: Record<string, string>; orphaned: string[]; loadByDay: Record<string, number> } {
   const proposal: Record<string, string> = {}
   const orphaned: string[] = []

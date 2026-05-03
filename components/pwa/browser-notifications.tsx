@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { DAILY, TODAY_STR } from "@/lib/planner/data"
+import { DAILY } from "@/lib/planner/data"
 import { TOPICS } from "@/lib/planner/data"
+import { getTodayStr } from "@/lib/planner/helpers"
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear()
@@ -14,7 +15,7 @@ function formatDateKey(date: Date) {
 function getTodayKey() {
   const now = new Date()
   const todayKey = formatDateKey(now)
-  return todayKey in DAILY ? todayKey : TODAY_STR
+  return todayKey in DAILY ? todayKey : getTodayStr()
 }
 
 function getTodayChapters() {

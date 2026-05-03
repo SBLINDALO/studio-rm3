@@ -3,11 +3,11 @@
 import { motion } from "framer-motion"
 import { Check, CalendarClock, Timer as TimerIcon, CheckCircle2, RotateCw, ArrowRight, Plus } from "lucide-react"
 import { useState } from "react"
-import { SUBJECTS, C, TODAY_STR, BOOKINGS } from "@/lib/planner/data"
+import { SUBJECTS, C, DAILY, BOOKINGS } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
 import { SkippedBanner } from "./skipped-banner"
 import { StudyDocViewer } from "./study-doc-viewer"
-import { daysUntil, fmtDuration } from "@/lib/planner/helpers"
+import { daysUntil, fmtDuration, getTodayStr } from "@/lib/planner/helpers"
 import { getDayItems } from "@/lib/planner/catchup"
 import { AddExamModal } from "./add-exam-modal"
 import { ExamArchive } from "./exam-archive"
@@ -55,9 +55,20 @@ export function TodayTab({
   onNavigate,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false)
-  const items = getDayItems(TODAY_STR, data)
+  const todayKey = getTodayStr()
+  const items = getDayItems(todayKey, data)
   const customExams = data.customExams ?? []
   const archivedExams = data.archivedExams ?? []
+  const todayLabel = new Date().toLocaleDateString("it-IT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
+  const displayTodayLabel = todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)
+  const studyDays = Object.keys(DAILY).filter((d) => DAILY[d]?.sessions?.length > 0).sort()
+  const currentDayIndex = studyDays.indexOf(todayKey)
+  const currentDayNumber = currentDayIndex >= 0 ? currentDayIndex + 1 : 1
+  const totalStudyDays = studyDays.length
   const upcomingBooking = BOOKINGS.find((b) => {
     const d = daysUntil(b.date)
     return d !== null && d >= 0
@@ -74,7 +85,7 @@ export function TodayTab({
         className="card-quiet p-4"
       >
         <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
-          Lunedì 20 Aprile · Giorno 1 di 54
+          {displayTodayLabel} · Giorno {currentDayNumber} di {totalStudyDays}
         </div>
         <h2 className="mt-1.5 text-[22px] font-semibold tracking-tight text-stone-900">
           Buono studio
@@ -242,7 +253,7 @@ export function TodayTab({
           {items.map((task, i) => {
             const done = task.done
             const isCatchup = task.kind === "catchup"
-            const docKey = isCatchup ? task.catchupId! : `${TODAY_STR}_${task.plannedIdx!}`
+            const docKey = isCatchup ? task.catchupId! : `${todayKey}_${task.plannedIdx!}`
             return (
               <motion.div
                 key={isCatchup ? `c_${task.catchupId}` : `p_${task.plannedIdx}`}
@@ -259,7 +270,7 @@ export function TodayTab({
                 <button
                   onClick={() => {
                     if (isCatchup && task.catchupId) toggleCatchupDone(task.catchupId)
-                    else if (task.plannedIdx !== undefined) toggleDaily(TODAY_STR, task.plannedIdx)
+                    else if (task.plannedIdx !== undefined) toggleDaily(todayKey, task.plannedIdx)
                   }}
                   className="flex items-start gap-3 text-left flex-1 min-w-0"
                 >

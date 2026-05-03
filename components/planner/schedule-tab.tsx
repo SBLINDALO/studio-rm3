@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronDown, GraduationCap, BookOpen, RotateCw, MapPin, X, Check } from "lucide-react"
-import { WEEKS, DAILY, C, SUBJECTS, PHASE_COLOR, TODAY_STR } from "@/lib/planner/data"
+import { WEEKS, DAILY, C, SUBJECTS, PHASE_COLOR } from "@/lib/planner/data"
+import { getTodayStr } from "@/lib/planner/helpers"
 import { SubjectIcon } from "./subject-icon"
 import { StudyDocViewer } from "./study-doc-viewer"
 import { getCatchupCountForDay, getDayItems } from "@/lib/planner/catchup"
@@ -21,6 +22,7 @@ interface Props {
 export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, removeDoc, skippedByDay }: Props) {
   const [openWeek, setOpenWeek] = useState<number>(0)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const todayKey = getTodayStr()
   const allStudyDays = Object.keys(DAILY).sort()
 
   return (
@@ -113,19 +115,22 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, r
                       const doneTasks = dayItems.filter((it) => it.done).length
                       const catchupOnDay = getCatchupCountForDay(dayStr, data)
                       const skippedOnDay = skippedByDay[dayStr] ?? 0
-                      const isPast = dayStr < TODAY_STR
+                      const isPast = dayStr < todayKey
+                      const isToday = dayStr === todayKey
                       const colSub = isExamDay && d.sub ? C[d.sub as SubjectKey] : null
 
                       return (
                         <div
                           key={dayStr}
-                          className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white"
+                          className="overflow-hidden rounded-xl border bg-white"
                           style={
-                            isExamDay && colSub
-                              ? { borderColor: colSub.border }
-                              : isSel
-                                ? { borderColor: "var(--border-strong)" }
-                                : undefined
+                            isToday
+                              ? { borderColor: "#94A3B8" }
+                              : isExamDay && colSub
+                                ? { borderColor: colSub.border }
+                                : isSel
+                                  ? { borderColor: "var(--border-strong)" }
+                                  : { borderColor: "var(--border-subtle)" }
                           }
                         >
                           {/* Day row header */}
@@ -154,6 +159,11 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, r
                                   <BookOpen size={12} strokeWidth={2} />
                                 )}
                                 <span className="font-semibold">{d.label}</span>
+                                {isToday && (
+                                  <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-800">
+                                    OGGI
+                                  </span>
+                                )}
                                 {d.sunday && (
                                   <RotateCw size={10} strokeWidth={2} className="text-stone-400" />
                                 )}

@@ -1,6 +1,7 @@
 import type { PlannerData, SubjectKey, SkippedItem } from "./types"
-import { SUBJECTS, TOPICS, DAILY, BOOKINGS, TODAY_STR } from "./data"
+import { SUBJECTS, TOPICS, DAILY, BOOKINGS } from "./data"
 import { getDayItems, scanSkipped } from "./catchup"
+import { getTodayStr } from "./helpers"
 
 export interface AiSnapshot {
   today: string
@@ -23,8 +24,9 @@ function daysBetween(a: string, b: string): number {
 }
 
 export function buildAiSnapshot(data: PlannerData): AiSnapshot {
-  const entry = DAILY[TODAY_STR]
-  const todayLabel = entry?.label ?? TODAY_STR
+  const todayKey = getTodayStr()
+  const entry = DAILY[todayKey]
+  const todayLabel = entry?.label ?? todayKey
 
   // Global + per-subject progress
   const bySubject = (Object.keys(SUBJECTS) as SubjectKey[]).map((k) => {
@@ -39,7 +41,7 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
   const gPct = gTotal ? Math.round((gDone / gTotal) * 100) : 0
 
   // Today's plan (planned + catchup)
-  const items = getDayItems(TODAY_STR, data)
+  const items = getDayItems(todayKey, data)
   const todayPlan = items.map((it) => ({
     sub: SUBJECTS[it.sub].name,
     dur: it.dur,
@@ -59,35 +61,35 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
 
   // Next exam / booking
   const upcomingExams = Object.entries(DAILY)
-    .filter(([d, v]) => v.exam && d >= TODAY_STR)
+    .filter(([d, v]) => v.exam && d >= todayKey)
     .sort(([a], [b]) => a.localeCompare(b))
   const nextExamEntry = upcomingExams[0]
   const nextExam = nextExamEntry
     ? {
         name: nextExamEntry[1].label ?? "Esame",
         date: nextExamEntry[0],
-        daysUntil: daysBetween(TODAY_STR, nextExamEntry[0]),
+        daysUntil: daysBetween(todayKey, nextExamEntry[0]),
       }
     : null
 
-  const upcomingBooking = BOOKINGS.find((b) => b.date >= TODAY_STR)
+  const upcomingBooking = BOOKINGS.find((b) => b.date >= todayKey)
   const nextBooking = upcomingBooking
     ? {
         name: upcomingBooking.label,
         date: upcomingBooking.date,
-        daysUntil: daysBetween(TODAY_STR, upcomingBooking.date),
+        daysUntil: daysBetween(todayKey, upcomingBooking.date),
       }
     : null
 
   // Today's focus minutes
   const focusTodayMin = Math.round(
     data.sessions
-      .filter((s) => s.date === TODAY_STR && s.mode === "focus")
+      .filter((s) => s.date === todayKey && s.mode === "focus")
       .reduce((sum, s) => sum + s.duration, 0),
   )
 
   return {
-    today: TODAY_STR,
+    today: todayKey,
     todayLabel,
     progress: {
       global: { done: gDone, total: gTotal, pct: gPct },
