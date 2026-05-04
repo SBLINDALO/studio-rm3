@@ -123,3 +123,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Font families */
+.font-system { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif; }
+.font-serif { font-family: Georgia, serif; }
+.font-mono { font-family: "JetBrains Mono", monospace; }
+
+/* Text sizes */
+.text-compact { font-size: 14px; }
+.text-normal { font-size: 16px; }
+.text-large { font-size: 18px; }
