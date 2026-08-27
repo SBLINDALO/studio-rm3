@@ -18,6 +18,7 @@ import {
 } from "recharts"
 import { SUBJECTS, TOPICS } from "@/lib/planner/data"
 import type { LoggedSession, SubjectKey, TopicStatus } from "@/lib/planner/types"
+import { parseISODate } from "@/lib/planner/utils/dates"
 
 const SUBJECT_COLORS: Record<SubjectKey, string> = {
   psico: "#E11D48",
@@ -43,8 +44,7 @@ function buildLast7Days() {
 }
 
 function parseDate(value: string) {
-  const parsed = new Date(`${value}T00:00:00`)
-  return Number.isNaN(parsed.getTime()) ? new Date(value) : parsed
+  return parseISODate(value)
 }
 
 interface StatsViewProps {
@@ -56,7 +56,7 @@ export function StatsView({ sessions, topics }: StatsViewProps) {
   const lastWeek = useMemo(() => buildLast7Days(), [])
 
   const formattedSubjectData = useMemo(() => {
-    const totals = SUBJECT_ORDER.reduce<Record<SubjectKey, number>>(
+    const totals = SUBJECT_ORDER.reduce<Partial<Record<SubjectKey, number>>>(
       (acc, subject) => ({ ...acc, [subject]: 0 }),
       {}
     )
@@ -65,13 +65,13 @@ export function StatsView({ sessions, topics }: StatsViewProps) {
 
     sessionData.forEach((session) => {
       if (session.subject) {
-        totals[session.subject] += session.duration
+        totals[session.subject] = (totals[session.subject] ?? 0) + session.duration
       }
     })
 
     return SUBJECT_ORDER.map((subject) => ({
       subject: SUBJECTS[subject].short,
-      hours: Number((totals[subject] / 60).toFixed(1)),
+      hours: Number(((totals[subject] ?? 0) / 60).toFixed(1)),
       subjectKey: subject,
     }))
   }, [sessions])

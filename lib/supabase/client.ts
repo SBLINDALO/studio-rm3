@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import type { DynamicExam } from "@/lib/planner/types"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -106,7 +107,7 @@ export type Exam = {
   color_text: string
   color_dot: string
   color_soft: string
-  material?: string
+  material?: DynamicExam["material"]
   subject_key?: string // per esami fissi
   archived: boolean
   created_at: string

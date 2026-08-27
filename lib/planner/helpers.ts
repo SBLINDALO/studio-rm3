@@ -1,5 +1,7 @@
+import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
+
 export const getTodayStr = (): string => {
-  return new Date().toLocaleDateString("sv-SE")
+  return formatISODate(new Date())
 }
 
 export const fmtTime = (s: number) => {
@@ -14,7 +16,7 @@ export const fmtDuration = (min: number) => {
 
 export const daysUntil = (iso: string | undefined): number | null => {
   if (!iso) return null
-  const today = new Date(getTodayStr())
-  const target = new Date(iso)
+  const today = parseISODate(getTodayStr())
+  const target = parseISODate(iso)
   return Math.ceil((target.getTime() - today.getTime()) / 86_400_000)
 }

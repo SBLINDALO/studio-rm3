@@ -12,7 +12,7 @@ import { getDayItems } from "@/lib/planner/catchup"
 import { AddExamModal } from "./add-exam-modal"
 import { ExamArchive } from "./exam-archive"
 import { ExamCardMenu } from "./exam-card-menu"
-import type { ArchivedExam, CustomExam, SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
+import type { ArchivedExam, DynamicExam, SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
 import type { TabId } from "./tabs-nav"
 
 interface Props {
@@ -21,7 +21,7 @@ interface Props {
   toggleCatchupDone: (id: string) => void
   attachDoc: (key: string, doc: StudyDoc) => void
   removeDoc: (key: string) => void
-  addCustomExam: (exam: CustomExam) => void
+  addCustomExam: (exam: Omit<DynamicExam, "id" | "createdAt" | "status">) => void | Promise<void>
   archiveExam: (id: string) => void
   removeExam: (id: string) => void
   restoreExam: (id: string) => void
@@ -65,7 +65,7 @@ export function TodayTab({
     month: "long",
   })
   const displayTodayLabel = todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)
-  const studyDays = Object.keys(DAILY).filter((d) => DAILY[d]?.sessions?.length > 0).sort()
+  const studyDays = Object.keys(DAILY).filter((d) => (DAILY[d]?.sessions?.length ?? 0) > 0).sort()
   const currentDayIndex = studyDays.indexOf(todayKey)
   const currentDayNumber = currentDayIndex >= 0 ? currentDayIndex + 1 : 1
   const totalStudyDays = studyDays.length
@@ -215,6 +215,11 @@ export function TodayTab({
                 </div>
                 <div className="text-[10px] text-stone-500">{d !== null ? `giorni · ${exam.examDate}` : exam.examDate}</div>
                 <div className="mt-1 text-[10px] text-stone-500">{exam.examTime}</div>
+                {exam.studyPlan?.planStatus === "too-late" && (
+                  <div className="mt-2 text-[11px] font-medium text-rose-600">
+                    Esame troppo vicino: ti mostriamo solo cosa rivedere subito.
+                  </div>
+                )}
               </motion.div>
             )
           })}

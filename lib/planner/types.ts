@@ -2,6 +2,52 @@ export type SubjectKey = "psico" | "radio" | "est" | "scog" | "genere"
 export type TimerMode = "focus" | "break"
 export type TopicStatus = "done" | "review" | null
 
+export interface StudyPlan {
+  planStatus?: "ready" | "review-only" | "too-late"
+  totalDaysAvailable: number
+  studyDaysPerWeek: 5
+  hoursPerDay: { min: 1; max: 1.5 }
+  reviewDaysBefore: 4
+  dailySchedule: Record<string, {
+    pages?: number
+    hours: { min: number; max: number }
+    topics?: string[]
+    completed: boolean
+    completedDate?: string
+  }>
+  totalPagesPerDay?: number
+  topicsPerDay?: number
+}
+
+export interface StudyProgress {
+  id: string
+  user_id: string
+  exam_id: string
+  chapter_id: string
+  date: string
+  status: "not_started" | "in_progress" | "completed"
+  time_spent: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DynamicExam {
+  id: string
+  name: string
+  startDate: string
+  examDate: string
+  material: {
+    type: "pages" | "pdf" | "notes" | "mixed"
+    totalPages?: number
+    files?: { name: string; url: string }[]
+    notes?: string
+    description?: string
+  }
+  studyPlan: StudyPlan
+  createdAt: number
+  status: "active" | "completed" | "archived"
+}
+
 export interface ActiveRecallQuestion {
   id: string
   question: string
@@ -132,10 +178,13 @@ export interface CustomExam {
   examType: "Scritto" | "Orale"
   examISO: string
   color: { bg: string; border: string; text: string; dot: string; soft: string }
-  material?: string
+  material?: DynamicExam["material"]
   subjectKey?: SubjectKey
   chapters: string[]
   createdAt: number
+  startDate?: string
+  studyPlan?: StudyPlan
+  status?: DynamicExam["status"]
 }
 
 export interface ArchivedExam {
@@ -163,6 +212,8 @@ export interface PlannerData {
   dismissedSkips: Record<string, true>
   docs: Record<string, StudyDoc>
   customExams: CustomExam[]
+  dynamicExams: DynamicExam[]
   archivedExams: ArchivedExam[]
   studyProgress: StudyProgress[]
+  quiz: Record<string, QuizEntry>
 }

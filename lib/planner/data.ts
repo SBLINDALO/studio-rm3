@@ -1,6 +1,6 @@
 import type { SubjectKey, Subject, Topics, DailySchedule, Week, Booking, PaletteEntry } from "./types"
 
-export const SUBJECTS: Record<SubjectKey, Subject> = {
+const DEFAULT_SUBJECTS: Record<SubjectKey, Subject> = {
   psico: {
     name: "Psicologia della Comunicazione",
     short: "Psicologia",
@@ -42,6 +42,32 @@ export const SUBJECTS: Record<SubjectKey, Subject> = {
     examISO: "2026-06-08",
   },
 }
+
+interface CustomExamLike {
+  id: string
+  name: string
+  examDate: string
+  examISO: string
+  examTime: string
+  examType: string
+}
+
+export function getSubjects(customExams: CustomExamLike[] = []) {
+  return {
+    ...DEFAULT_SUBJECTS,
+    ...Object.fromEntries(customExams.map((exam) => [exam.id, {
+      name: exam.name,
+      short: exam.name.slice(0, 12),
+      examDate: exam.examDate,
+      examTime: exam.examTime,
+      examType: exam.examType,
+      examISO: exam.examISO,
+    }])),
+  } as Record<string, Subject>
+}
+
+// Le schermate del calendario storico usano ancora le cinque materie predefinite.
+export const SUBJECTS = DEFAULT_SUBJECTS
 
 export const C: Record<SubjectKey | "gen", PaletteEntry> = {
   psico:  { bg: "#FFF5F6", border: "#F4D4D8", text: "#9F1239", dot: "#E11D48", soft: "#FFFAFB" },

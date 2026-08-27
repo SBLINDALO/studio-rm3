@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { ArchivedExam, CatchupItem, CustomExam, PlannerData, SubjectKey, TopicStatus, LoggedSession, StudyDoc } from "@/lib/planner/types"
+import type { ArchivedExam, CatchupItem, CustomExam, DynamicExam, PlannerData, SubjectKey, TopicStatus, LoggedSession, StudyDoc } from "@/lib/planner/types"
 import { SUBJECTS, TOPICS } from "@/lib/planner/data"
 import { getTodayStr } from "@/lib/planner/helpers"
 import { useSupabaseSync } from "./use-supabase-sync"
 import { getAllExams, addCustomExam as addExamToSupabase, removeExam as removeExamFromSupabase, archiveExam as archiveExamToSupabase, restoreExam as restoreExamFromSupabase } from "@/lib/supabase/exams"
-import { getStudyProgress, updateChapterProgress, getDailyStats, getStreak } from "@/lib/supabase/study-progress"
+import { getStudyProgress, updateChapterProgress as updateChapterProgressInSupabase, getDailyStats, getStreak } from "@/lib/supabase/study-progress"
 import type { StudyProgress } from "@/lib/supabase/client"
 
 const STORAGE_KEY = "planner5v3"
@@ -22,6 +22,9 @@ const initialData: PlannerData = {
   quiz: {},
   dismissedSkips: {},
   docs: {},
+  customExams: [],
+  archivedExams: [],
+  dynamicExams: [],
   // customExams e archivedExams sono gestiti da Supabase
   studyProgress: [],
 }
@@ -111,9 +114,10 @@ export function usePlanner() {
         // Carica esami da Supabase
         const userId = "test-user"
         try {
-          const { customExams, archivedExams } = await getAllExams(userId)
+          const { customExams, archivedExams, dynamicExams } = await getAllExams()
           parsed.customExams = customExams
           parsed.archivedExams = archivedExams
+          parsed.dynamicExams = dynamicExams
         } catch (examError) {
           console.error('Error loading exams from Supabase:', examError)
           // Imposta valori di default se Supabase fallisce
@@ -259,11 +263,10 @@ export function usePlanner() {
   )
 
   const addCustomExam = useCallback(
-    async (exam: Omit<CustomExam, 'id' | 'createdAt'>) => {
+    async (exam: Omit<DynamicExam, "id" | "createdAt" | "status">) => {
       try {
-        const userId = "test-user"
-        const updatedCustomExams = await addExamToSupabase(exam, userId)
-        setData(prev => ({ ...prev, customExams: updatedCustomExams }))
+        const result = await addExamToSupabase(exam)
+        setData(prev => ({ ...prev, ...result }))
       } catch (error) {
         console.error('Error adding custom exam:', error)
       }
@@ -287,12 +290,12 @@ export function usePlanner() {
   const removeExam = useCallback(
     async (id: string) => {
       try {
-        const userId = "test-user"
-        const { customExams, archivedExams } = await removeExamFromSupabase(id, userId)
+        const { customExams, archivedExams, dynamicExams } = await removeExamFromSupabase(id)
         setData(prev => ({
           ...prev,
           customExams,
           archivedExams,
+          dynamicExams,
           docs: cleanExamDocs(id),
         }))
       } catch (error) {
@@ -305,12 +308,12 @@ export function usePlanner() {
   const archiveExam = useCallback(
     async (id: string) => {
       try {
-        const userId = "test-user"
-        const { customExams, archivedExams } = await archiveExamToSupabase(id, userId)
+        const { customExams, archivedExams, dynamicExams } = await archiveExamToSupabase(id)
         setData(prev => ({
           ...prev,
           customExams,
           archivedExams,
+          dynamicExams,
           docs: cleanExamDocs(id),
         }))
       } catch (error) {
@@ -323,12 +326,12 @@ export function usePlanner() {
   const restoreExam = useCallback(
     async (id: string) => {
       try {
-        const userId = "test-user"
-        const { customExams, archivedExams } = await restoreExamFromSupabase(id, userId)
+        const { customExams, archivedExams, dynamicExams } = await restoreExamFromSupabase(id)
         setData(prev => ({
           ...prev,
           customExams,
           archivedExams,
+          dynamicExams,
         }))
       } catch (error) {
         console.error('Error restoring exam:', error)
@@ -341,7 +344,7 @@ export function usePlanner() {
     async (examId: string, chapterId: string, status: "not_started" | "in_progress" | "completed", timeSpent?: number) => {
       try {
         const userId = "test-user"
-        const updatedProgress = await updateChapterProgress(userId, examId, chapterId, status, timeSpent)
+        const updatedProgress = await updateChapterProgressInSupabase(userId, examId, chapterId, status, timeSpent)
         setData(prev => ({
           ...prev,
           studyProgress: prev.studyProgress.map(p => p.id === updatedProgress.id ? updatedProgress : p)

@@ -2,6 +2,7 @@ import type { PlannerData, SubjectKey, SkippedItem } from "./types"
 import { SUBJECTS, TOPICS, DAILY, BOOKINGS } from "./data"
 import { getDayItems, scanSkipped } from "./catchup"
 import { getTodayStr } from "./helpers"
+import { parseISODate } from "./utils/dates"
 
 export interface AiSnapshot {
   today: string
@@ -18,8 +19,8 @@ export interface AiSnapshot {
 }
 
 function daysBetween(a: string, b: string): number {
-  const da = new Date(a + "T00:00:00")
-  const db = new Date(b + "T00:00:00")
+  const da = parseISODate(a)
+  const db = parseISODate(b)
   return Math.round((db.getTime() - da.getTime()) / 86_400_000)
 }
 

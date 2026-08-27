@@ -102,7 +102,6 @@ function scheduleLocalNotification(id: string, delayMs: number, title: string, b
         icon: "/icon.svg",
         badge: "/icon-light-32x32.png",
         tag: id,
-        renotify: true,
       })
     } catch {
       // ignore

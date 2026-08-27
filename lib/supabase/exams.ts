@@ -1,175 +1,62 @@
 import { supabase } from "./client"
-import type { Exam } from "./client"
-import type { CustomExam, ArchivedExam } from "@/lib/planner/types"
+import type { ArchivedExam, CustomExam, DynamicExam } from "@/lib/planner/types"
+import { parseISODate } from "@/lib/planner/utils/dates"
 
-// Funzione per ottenere tutti gli esami di un utente
-export async function getAllExams(userId: string): Promise<{ customExams: CustomExam[]; archivedExams: ArchivedExam[] }> {
-  try {
-    const { data, error } = await supabase
-      .from('exams')
-      .select('*')
-      .eq('user_id', userId)
-
-    if (error) {
-      console.error('Error fetching exams:', error)
-      throw error
-    }
-
-    const customExams: CustomExam[] = []
-    const archivedExams: ArchivedExam[] = []
-
-    data.forEach((exam: Exam) => {
-      if (exam.archived) {
-        // Per archived, dobbiamo calcolare topicsTotal, topicsDone, completionPct
-        // Per ora, mettiamo valori di default o calcoliamo se possibile
-        archivedExams.push({
-          id: exam.id,
-          name: exam.name,
-          short: exam.short,
-          examISO: exam.exam_iso,
-          examTime: exam.exam_time,
-          examType: exam.exam_type,
-          color: {
-            dot: exam.color_dot,
-            text: exam.color_text,
-            bg: exam.color_bg,
-          },
-          completedAt: new Date(exam.updated_at).getTime(),
-          topicsTotal: 0, // TODO: calcolare
-          topicsDone: 0, // TODO: calcolare
-          completionPct: 0, // TODO: calcolare
-        })
-      } else {
-        customExams.push({
-          id: exam.id,
-          name: exam.name,
-          short: exam.short,
-          examDate: exam.exam_date,
-          examTime: exam.exam_time,
-          examType: exam.exam_type,
-          examISO: exam.exam_iso,
-          color: {
-            bg: exam.color_bg,
-            border: exam.color_border,
-            text: exam.color_text,
-            dot: exam.color_dot,
-            soft: exam.color_soft,
-          },
-          material: exam.material,
-          createdAt: new Date(exam.created_at).getTime(),
-        })
-      }
-    })
-
-    return { customExams, archivedExams }
-  } catch (error) {
-    console.error('Error in getAllExams:', error)
-    throw error
-  }
+async function getUserId() {
+  const { data, error } = await supabase.auth.getUser()
+  if (error) throw error
+  if (!data.user) throw new Error("È necessario effettuare l'accesso per gestire gli esami")
+  return data.user.id
 }
 
-// Funzione per aggiungere un esame personalizzato
-export async function addCustomExam(exam: Omit<CustomExam, 'id' | 'createdAt'>, userId: string): Promise<CustomExam[]> {
-  try {
-    const newExam: Omit<Exam, 'id' | 'created_at' | 'updated_at'> = {
-      user_id: userId,
-      name: exam.name,
-      short: exam.short,
-      exam_date: exam.examDate,
-      exam_time: exam.examTime,
-      exam_type: exam.examType,
-      exam_iso: exam.examISO,
-      color_bg: exam.color.bg,
-      color_border: exam.color.border,
-      color_text: exam.color.text,
-      color_dot: exam.color.dot,
-      color_soft: exam.color.soft,
-      material: exam.material,
-      archived: false,
-    }
-
-    const { data, error } = await supabase
-      .from('exams')
-      .insert(newExam)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error adding exam:', error)
-      throw error
-    }
-
-    // Ritorna tutti gli esami aggiornati
-    const { customExams } = await getAllExams(userId)
-    return customExams
-  } catch (error) {
-    console.error('Error in addCustomExam:', error)
-    throw error
-  }
+function toCustomExam(exam: DynamicExam, index: number): CustomExam {
+  const colors = [
+    { bg: "#FFF1F2", border: "#FDA4AF", text: "#BE123C", dot: "#F43F5E", soft: "#FFFAFB" },
+    { bg: "#EEF2FF", border: "#A5B4FC", text: "#3730A3", dot: "#6366F1", soft: "#F8FAFE" },
+    { bg: "#FFFBEB", border: "#FCD34D", text: "#92400E", dot: "#F59E0B", soft: "#FFFCF4" },
+    { bg: "#ECFDF5", border: "#6EE7B7", text: "#065F46", dot: "#10B981", soft: "#F7FCF9" },
+  ]
+  const formattedDate = parseISODate(exam.examDate).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })
+  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examDate: formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1), examTime: "—", examType: "Scritto", examISO: exam.examDate, color: colors[index % colors.length], material: exam.material, chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [], createdAt: exam.createdAt, startDate: exam.startDate, studyPlan: exam.studyPlan, status: exam.status }
 }
 
-// Funzione per rimuovere un esame
-export async function removeExam(id: string, userId: string): Promise<{ customExams: CustomExam[]; archivedExams: ArchivedExam[] }> {
-  try {
-    const { error } = await supabase
-      .from('exams')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId)
-
-    if (error) {
-      console.error('Error removing exam:', error)
-      throw error
-    }
-
-    // Ritorna tutti gli esami aggiornati
-    return await getAllExams(userId)
-  } catch (error) {
-    console.error('Error in removeExam:', error)
-    throw error
-  }
+function toArchivedExam(exam: DynamicExam): ArchivedExam {
+  const completed = Object.values(exam.studyPlan.dailySchedule).filter((day) => day.completed).length
+  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examISO: exam.examDate, examType: "Scritto", color: { dot: "#64748B", text: "#475569", bg: "#F8FAFC" }, completedAt: exam.createdAt, topicsTotal: Object.keys(exam.studyPlan.dailySchedule).length, topicsDone: completed, completionPct: 0 }
 }
 
-// Funzione per archiviare un esame
-export async function archiveExam(id: string, userId: string): Promise<{ customExams: CustomExam[]; archivedExams: ArchivedExam[] }> {
-  try {
-    const { error } = await supabase
-      .from('exams')
-      .update({ archived: true, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', userId)
-
-    if (error) {
-      console.error('Error archiving exam:', error)
-      throw error
-    }
-
-    // Ritorna tutti gli esami aggiornati
-    return await getAllExams(userId)
-  } catch (error) {
-    console.error('Error in archiveExam:', error)
-    throw error
-  }
+export async function getAllExams(): Promise<{ customExams: CustomExam[]; archivedExams: ArchivedExam[]; dynamicExams: DynamicExam[] }> {
+  await getUserId()
+  const { data, error } = await supabase.from("dynamic_exams").select("*").order("exam_date", { ascending: true })
+  if (error) throw error
+  const dynamicExams: DynamicExam[] = (data ?? []).map((row) => ({ id: row.id, name: row.name, startDate: row.start_date, examDate: row.exam_date, material: row.material, studyPlan: row.study_plan, createdAt: new Date(row.created_at).getTime(), status: row.status }))
+  return { dynamicExams, customExams: dynamicExams.filter((exam) => exam.status === "active").map(toCustomExam), archivedExams: dynamicExams.filter((exam) => exam.status !== "active").map(toArchivedExam) }
 }
 
-// Funzione per ripristinare un esame
-export async function restoreExam(id: string, userId: string): Promise<{ customExams: CustomExam[]; archivedExams: ArchivedExam[] }> {
-  try {
-    const { error } = await supabase
-      .from('exams')
-      .update({ archived: false, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', userId)
+export async function addCustomExam(exam: Omit<DynamicExam, "id" | "createdAt" | "status">) {
+  const userId = await getUserId()
+  const { error } = await supabase.from("dynamic_exams").insert({ user_id: userId, name: exam.name, start_date: exam.startDate, exam_date: exam.examDate, material: exam.material, study_plan: exam.studyPlan, status: "active" })
+  if (error) throw error
+  return getAllExams()
+}
 
-    if (error) {
-      console.error('Error restoring exam:', error)
-      throw error
-    }
+export async function removeExam(id: string) {
+  await getUserId()
+  const { error } = await supabase.from("dynamic_exams").delete().eq("id", id)
+  if (error) throw error
+  return getAllExams()
+}
 
-    // Ritorna tutti gli esami aggiornati
-    return await getAllExams(userId)
-  } catch (error) {
-    console.error('Error in restoreExam:', error)
-    throw error
-  }
+export async function archiveExam(id: string) {
+  await getUserId()
+  const { error } = await supabase.from("dynamic_exams").update({ status: "archived" }).eq("id", id)
+  if (error) throw error
+  return getAllExams()
+}
+
+export async function restoreExam(id: string) {
+  await getUserId()
+  const { error } = await supabase.from("dynamic_exams").update({ status: "active" }).eq("id", id)
+  if (error) throw error
+  return getAllExams()
 }

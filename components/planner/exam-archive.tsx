@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { ChevronDown, ChevronUp, RotateCw } from "lucide-react"
 import { useState } from "react"
 import type { ArchivedExam } from "@/lib/planner/types"
+import { parseISODate } from "@/lib/planner/utils/dates"
 
 interface Props {
   archivedExams: ArchivedExam[]
@@ -56,7 +57,7 @@ export function ExamArchive({ archivedExams, onRestore }: Props) {
                         <span>{exam.name}</span>
                       </div>
                       <p className="mt-2 text-xs uppercase tracking-[0.18em] text-stone-500">
-                        {exam.examType} · {new Date(exam.examISO).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}
+                        {exam.examType} · {parseISODate(exam.examISO).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>
                     <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">

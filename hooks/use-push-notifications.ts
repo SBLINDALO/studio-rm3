@@ -87,7 +87,7 @@ export function usePushNotifications() {
     if (!subscription) return false
 
     try {
-      await subscription.unsubscribe()
+      await (subscription as PushSubscription).unsubscribe()
       setSubscription(null)
       setEnabled(false)
 

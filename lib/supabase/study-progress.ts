@@ -1,5 +1,6 @@
 import { supabase } from "./client"
 import type { StudyProgress } from "./client"
+import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 
 // Funzione per ottenere il progresso di studio per un esame
 export async function getStudyProgress(userId: string, examId: string): Promise<StudyProgress[]> {
@@ -31,7 +32,7 @@ export async function updateChapterProgress(
   timeSpent?: number
 ): Promise<StudyProgress> {
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const today = formatISODate(new Date())
 
     // Prima, cerca se esiste già un record per oggi
     const { data: existing, error: fetchError } = await supabase
@@ -154,8 +155,8 @@ export async function getStreak(userId: string): Promise<number> {
         // Se oggi non c'è completamento, streak 0
         break
       } else {
-        const prevDate = new Date(uniqueDates[i-1])
-        const currDate = new Date(date)
+        const prevDate = parseISODate(uniqueDates[i-1])
+        const currDate = parseISODate(date)
         const diffTime = prevDate.getTime() - currDate.getTime()
         const diffDays = diffTime / (1000 * 3600 * 24)
         if (diffDays === 1) {

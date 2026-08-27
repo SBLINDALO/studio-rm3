@@ -98,6 +98,29 @@ ALTER TABLE user_check ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_catchup ENABLE ROW LEVEL SECURITY;
 
+-- Esami dinamici: il client non invia user_id, viene assegnato dalla sessione autenticata.
+CREATE TABLE IF NOT EXISTS dynamic_exams (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  exam_date DATE NOT NULL,
+  material JSONB NOT NULL DEFAULT '{}'::JSONB,
+  study_plan JSONB NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived'))
+);
+
+ALTER TABLE dynamic_exams ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own dynamic exams" ON dynamic_exams;
+DROP POLICY IF EXISTS "Users can insert own dynamic exams" ON dynamic_exams;
+DROP POLICY IF EXISTS "Users can update own dynamic exams" ON dynamic_exams;
+DROP POLICY IF EXISTS "Users can delete own dynamic exams" ON dynamic_exams;
+CREATE POLICY "Users can view own dynamic exams" ON dynamic_exams FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own dynamic exams" ON dynamic_exams FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own dynamic exams" ON dynamic_exams FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own dynamic exams" ON dynamic_exams FOR DELETE USING (auth.uid() = user_id);
+
 -- Policy per user_progress
 CREATE POLICY "Users can view own progress" ON user_progress
   FOR SELECT USING (auth.uid() = user_id);
