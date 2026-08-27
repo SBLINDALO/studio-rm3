@@ -1,6 +1,7 @@
 import { supabase } from "./client"
 import type { ArchivedExam, CustomExam, DynamicExam } from "@/lib/planner/types"
 import { parseISODate } from "@/lib/planner/utils/dates"
+import { calculateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
 
 async function getUserId() {
   const { data, error } = await supabase.auth.getUser()
@@ -57,6 +58,39 @@ export async function archiveExam(id: string) {
 export async function restoreExam(id: string) {
   await getUserId()
   const { error } = await supabase.from("dynamic_exams").update({ status: "active" }).eq("id", id)
+  if (error) throw error
+  return getAllExams()
+}
+
+// Aggiorna nome/data/materiale di un esame e ricalcola il piano preservando i giorni già completati
+export async function updateExamMaterial(
+  exam: DynamicExam,
+  updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material">>,
+) {
+  await getUserId()
+  const merged: DynamicExam = { ...exam, ...updates }
+  const studyPlan = calculateStudyPlan(merged, exam.studyPlan)
+  const { error } = await supabase
+    .from("dynamic_exams")
+    .update({ name: merged.name, exam_date: merged.examDate, material: merged.material, study_plan: studyPlan })
+    .eq("id", exam.id)
+  if (error) throw error
+  return getAllExams()
+}
+
+// Segna come completato/non completato un giorno del piano di studio
+export async function setDayCompletion(exam: DynamicExam, date: string, completed: boolean) {
+  await getUserId()
+  const day = exam.studyPlan.dailySchedule[date]
+  if (!day) return getAllExams()
+  const studyPlan = {
+    ...exam.studyPlan,
+    dailySchedule: {
+      ...exam.studyPlan.dailySchedule,
+      [date]: { ...day, completed, completedDate: completed ? date : undefined },
+    },
+  }
+  const { error } = await supabase.from("dynamic_exams").update({ study_plan: studyPlan }).eq("id", exam.id)
   if (error) throw error
   return getAllExams()
 }

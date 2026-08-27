@@ -14,10 +14,20 @@ export interface StudyPlan {
     topics?: string[]
     completed: boolean
     completedDate?: string
+    isReview?: boolean
   }>
   totalPagesPerDay?: number
   topicsPerDay?: number
 }
+
+export interface DayLoad {
+  totalPages: number
+  totalHours: number
+  isOverload: boolean
+  exams: Array<{ examName: string; pages: number; hours: { min: number; max: number } }>
+}
+
+export type BalancedSchedule = Record<string, DayLoad>
 
 export interface StudyProgress {
   id: string
