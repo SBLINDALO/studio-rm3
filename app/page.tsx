@@ -24,8 +24,9 @@ import { ProgressTab } from "@/components/planner/progress-tab"
 import { NotificationSettings } from "@/components/planner/notification-settings"
 import { Toast, type ToastState } from "@/components/planner/toast"
 import { scanSkipped } from "@/lib/planner/catchup"
+import { ExamsProvider } from "@/components/exams/exams-context"
 
-export default function PlannerPage() {
+function PlannerPageContent() {
   const {
     data,
     loaded,
@@ -335,7 +336,7 @@ export default function PlannerPage() {
   // Loading state
   if (!loaded) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#FBFBF9]">
+      <div className="flex h-screen items-center justify-center bg-background">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
@@ -347,7 +348,7 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="relative mx-auto min-h-screen max-w-[680px] overflow-x-hidden bg-[#FBFBF9] pb-24 antialiased">
+    <div className="relative mx-auto min-h-screen max-w-[680px] overflow-x-hidden bg-background pb-24 antialiased">
       <FocusView
         open={focusView}
         timerRemaining={timerRemaining}
@@ -425,6 +426,7 @@ export default function PlannerPage() {
                 skippedCount={skippedItems.length}
                 onOpenCatchup={() => setCatchupOpen(true)}
                 onNavigate={setTab}
+                onShowToast={showToast}
               />
             )}
             {tab === "schedule" && (
@@ -477,5 +479,13 @@ export default function PlannerPage() {
 
       <TabsNav tab={tab} onChange={setTab} />
     </div>
+  )
+}
+
+export default function PlannerPage() {
+  return (
+    <ExamsProvider>
+      <PlannerPageContent />
+    </ExamsProvider>
   )
 }

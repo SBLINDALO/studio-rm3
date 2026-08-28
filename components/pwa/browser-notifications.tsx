@@ -57,7 +57,7 @@ function msUntil(date: Date) {
 function buildNotificationPayload() {
   const todayChapters = getTodayChapters()
   const progressPct = getCurrentProgressPct()
-  const morningTarget = getNextFireTime(10, 0)
+  const morningTarget = getNextFireTime(8, 0)
   const afternoonTarget = getNextFireTime(15, 30)
 
   return {

@@ -7,6 +7,19 @@ export function daysRemaining(exam: DynamicExam): number {
   return Math.ceil((examDate.getTime() - today.getTime()) / 86_400_000)
 }
 
+// Conto alla rovescia con precisione oraria per esami entro le prossime 48 ore
+export function countdownLabel(exam: DynamicExam): string {
+  const days = daysRemaining(exam)
+  if (days > 1) return `${days} giorni`
+  const examEndOfDay = parseISODate(exam.examDate)
+  examEndOfDay.setHours(23, 59, 59, 999)
+  const msLeft = Math.max(0, examEndOfDay.getTime() - Date.now())
+  const hoursLeft = Math.floor(msLeft / 3_600_000)
+  if (days === 1) return `1 giorno · ${hoursLeft}h`
+  if (days === 0) return hoursLeft > 0 ? `Oggi · ${hoursLeft}h rimanenti` : "Oggi"
+  return "Esame passato"
+}
+
 export function materialTopics(material: DynamicExam["material"]): string[] {
   return material.notes?.split("\n").map((topic) => topic.trim()).filter(Boolean) ?? []
 }

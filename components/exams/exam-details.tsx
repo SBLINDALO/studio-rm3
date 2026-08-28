@@ -1,10 +1,11 @@
 "use client"
 
-import { ArrowLeft, BookOpen, CalendarDays, Clock3, Edit3, FileText, FileType2, StickyNote } from "lucide-react"
+import { ArrowLeft, BookOpen, CalendarDays, Clock3, Download, Edit3, FileText, FileType2, StickyNote } from "lucide-react"
 import type { DynamicExam } from "@/lib/planner/types"
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 import { computeExamProgress, daysRemaining, materialTopics } from "./exam-utils"
 import { MaterialIcon } from "./material-icon"
+import { exportExamReportPdf } from "@/lib/planner/pdf-report"
 
 interface Props {
   exam: DynamicExam
@@ -67,6 +68,9 @@ export function ExamDetails({ exam, onBack, onEdit }: Props) {
             <Edit3 size={14} /> Modifica
           </button>
         )}
+        <button type="button" onClick={() => exportExamReportPdf(exam)} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50" aria-label="Esporta report PDF">
+          <Download size={14} /> PDF
+        </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

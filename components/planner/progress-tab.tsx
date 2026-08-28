@@ -1,9 +1,13 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { BarChart3, Calendar, Clock, Flame, Target, TrendingUp } from "lucide-react"
-import { useMemo } from "react"
+import { BarChart3, Clock, Download, Flame, Target, TrendingUp } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import type { PlannerData } from "@/lib/planner/types"
+import { useExams } from "@/components/exams/exams-context"
+import { computeExamProgress } from "@/components/exams/exam-utils"
+import { getWeeklyProgress, type DailyProgressPoint } from "@/lib/supabase/exams"
+import { exportFullProgressReportPdf } from "@/lib/planner/pdf-report"
 
 interface Props {
   data: PlannerData
@@ -11,25 +15,36 @@ interface Props {
   streak: number
 }
 
+const WEEKDAY_LABELS = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"]
+
 export function ProgressTab({ data, dailyStats, streak }: Props) {
-  // Calcoli per i grafici (placeholder per ora)
-  const weeklyProgress = useMemo(() => {
-    // Placeholder: genera dati casuali per 7 giorni
-    return Array.from({ length: 7 }, (_, i) => ({
-      day: ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'][i],
-      chapters: Math.floor(Math.random() * 5) + 1,
-      time: Math.floor(Math.random() * 120) + 30,
-    }))
+  const { activeExams } = useExams()
+  const [weeklyProgress, setWeeklyProgress] = useState<DailyProgressPoint[]>([])
+  const [weeklyLoading, setWeeklyLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    getWeeklyProgress(7)
+      .then((points) => { if (!cancelled) setWeeklyProgress(points) })
+      .catch(() => { if (!cancelled) setWeeklyProgress([]) })
+      .finally(() => { if (!cancelled) setWeeklyLoading(false) })
+    return () => { cancelled = true }
   }, [])
 
-  const examProgress = useMemo(() => {
-    return data.customExams.map(exam => ({
-      name: exam.short,
-      completed: Math.floor(Math.random() * exam.chapters.length), // Placeholder
-      total: exam.chapters.length,
-      percentage: Math.floor(Math.random() * 100),
-    }))
-  }, [data.customExams])
+  const maxHours = useMemo(
+    () => Math.max(1, ...weeklyProgress.map((point) => point.hoursStudied)),
+    [weeklyProgress],
+  )
+
+  const examProgress = useMemo(
+    () => activeExams.map((exam) => ({ exam, progress: computeExamProgress(exam) })),
+    [activeExams],
+  )
+
+  const totalWeeklyHours = useMemo(
+    () => weeklyProgress.reduce((sum, point) => sum + point.hoursStudied, 0),
+    [weeklyProgress],
+  )
 
   return (
     <div className="space-y-6">
@@ -78,22 +93,30 @@ export function ProgressTab({ data, dailyStats, streak }: Props) {
           <BarChart3 className="h-4 w-4 text-stone-600" />
           <h3 className="text-[14px] font-semibold text-stone-900">Progressi settimanali</h3>
         </div>
-        <div className="space-y-3">
-          {weeklyProgress.map((day, index) => (
-            <div key={day.day} className="flex items-center gap-3">
-              <div className="w-8 text-[12px] font-medium text-stone-500">{day.day}</div>
-              <div className="flex-1">
-                <div className="h-2 bg-stone-200 rounded-full">
-                  <div
-                    className="h-2 bg-blue-500 rounded-full transition-all duration-500"
-                    style={{ width: `${(day.chapters / 6) * 100}%` }}
-                  ></div>
+        {weeklyLoading ? (
+          <p className="text-[12px] text-stone-400">Caricamento…</p>
+        ) : (
+          <div className="space-y-3">
+            {weeklyProgress.map((point) => {
+              const date = new Date(`${point.date}T00:00:00`)
+              const label = WEEKDAY_LABELS[date.getDay()]
+              return (
+                <div key={point.date} className="flex items-center gap-3">
+                  <div className="w-8 text-[12px] font-medium text-stone-500">{label}</div>
+                  <div className="flex-1">
+                    <div className="h-2 bg-stone-200 rounded-full">
+                      <div
+                        className="h-2 bg-blue-500 rounded-full transition-all duration-500"
+                        style={{ width: `${(point.hoursStudied / maxHours) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="text-[12px] text-stone-600 tabular-nums">{point.hoursStudied.toFixed(1)}h</div>
                 </div>
-              </div>
-              <div className="text-[12px] text-stone-600">{day.chapters} cap</div>
-            </div>
-          ))}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </motion.div>
 
       {/* Exam Progress */}
@@ -103,27 +126,42 @@ export function ProgressTab({ data, dailyStats, streak }: Props) {
         transition={{ delay: 0.3 }}
         className="card-quiet p-4"
       >
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="h-4 w-4 text-stone-600" />
-          <h3 className="text-[14px] font-semibold text-stone-900">Avanzamento esami</h3>
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-stone-600" />
+            <h3 className="text-[14px] font-semibold text-stone-900">Avanzamento esami</h3>
+          </div>
+          {examProgress.length > 0 && (
+            <button
+              type="button"
+              onClick={() => exportFullProgressReportPdf(examProgress.map((item) => item.exam))}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1.5 text-[11px] font-medium text-stone-600 hover:bg-stone-50"
+            >
+              <Download className="h-3.5 w-3.5" /> Esporta PDF
+            </button>
+          )}
         </div>
-        <div className="space-y-4">
-          {examProgress.map((exam, index) => (
-            <div key={exam.name} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-medium text-stone-700">{exam.name}</span>
-                <span className="text-[12px] text-stone-500">{exam.completed}/{exam.total}</span>
+        {examProgress.length === 0 ? (
+          <p className="text-[12px] text-stone-400">Nessun esame attivo da mostrare.</p>
+        ) : (
+          <div className="space-y-4">
+            {examProgress.map(({ exam, progress }) => (
+              <div key={exam.id} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-medium text-stone-700">{exam.name}</span>
+                  <span className="text-[12px] text-stone-500">{progress.daysDone}/{progress.daysTotal}</span>
+                </div>
+                <div className="h-2 bg-stone-200 rounded-full">
+                  <div
+                    className="h-2 bg-green-500 rounded-full transition-all duration-500"
+                    style={{ width: `${progress.completionPct}%` }}
+                  ></div>
+                </div>
+                <div className="text-right text-[10px] text-stone-500">{progress.completionPct}% completato</div>
               </div>
-              <div className="h-2 bg-stone-200 rounded-full">
-                <div
-                  className="h-2 bg-green-500 rounded-full transition-all duration-500"
-                  style={{ width: `${exam.percentage}%` }}
-                ></div>
-              </div>
-              <div className="text-right text-[10px] text-stone-500">{exam.percentage}% completato</div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </motion.div>
 
       {/* Time Stats */}
@@ -143,7 +181,7 @@ export function ProgressTab({ data, dailyStats, streak }: Props) {
             <div className="text-[12px] text-stone-500">ore oggi</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-stone-900">24</div>
+            <div className="text-2xl font-bold text-stone-900">{totalWeeklyHours.toFixed(1)}</div>
             <div className="text-[12px] text-stone-500">ore questa settimana</div>
           </div>
         </div>

@@ -8,6 +8,8 @@ import { ServiceWorkerRegister } from '@/components/pwa/service-worker-register'
 import { BrowserNotifications } from '@/components/pwa/browser-notifications'
 import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { OfflineIndicator } from '@/components/pwa/offline-indicator'
+import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 
 // Initialize fonts
 const _geist = V0_Font_Geist({ subsets: ['latin'], weight: ["100","200","300","400","500","600","700","800","900"] })
@@ -69,7 +71,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="it" className="bg-[#FBFBF9]">
+    <html lang="it" className="bg-background" suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -77,12 +79,15 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-sans antialiased">
-        <OfflineIndicator />
-        {children}
-        <InstallPrompt />
-        <ServiceWorkerRegister />
-        <BrowserNotifications />
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <OfflineIndicator />
+          {children}
+          <Toaster position="top-center" />
+          <InstallPrompt />
+          <ServiceWorkerRegister />
+          <BrowserNotifications />
+          {process.env.NODE_ENV === 'production' && <Analytics />}
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -42,7 +42,7 @@ export function TodayStudyPlan() {
 
   const totals = useMemo(() => {
     const totalPages = todayTasks.reduce((sum, { day }) => sum + (day?.pages || 0), 0)
-    const totalHours = todayTasks.reduce((sum, { day }) => Math.max(sum, day?.hours.max || 0), 0)
+    const totalHours = todayTasks.reduce((sum, { day }) => sum + (day?.hours.max || 0), 0)
     return { totalPages, totalHours }
   }, [todayTasks])
 
@@ -70,6 +70,12 @@ export function TodayStudyPlan() {
           <div className="mt-1 text-lg font-semibold text-stone-900">{totals.totalHours.toFixed(1)}h</div>
         </div>
       </div>
+
+      {totals.totalHours > 1.5 && (
+        <div role="alert" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          Il carico di oggi supera 1,5 ore consigliate.
+        </div>
+      )}
 
       {todayTasks.length === 0 ? (
         <p className="mt-4 text-sm text-stone-500">Nessun compito pianificato per oggi.</p>

@@ -6,6 +6,9 @@ import { TrendingUp, GraduationCap, AlertTriangle, Settings } from "lucide-react
 import { SUBJECTS, C } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
 import type { SubjectKey } from "@/lib/planner/types"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { useExams } from "@/components/exams/exams-context"
+import { countdownLabel, daysRemaining } from "@/components/exams/exam-utils"
 
 const SUBJECT_COLORS: Record<SubjectKey, string> = {
   psico: "#E11D48",
@@ -34,6 +37,7 @@ export function Header({
   onOpenSettings,
   getProgress,
 }: Props) {
+  const { activeExams } = useExams()
   const [expanded, setExpanded] = useState(false)
   const [displayPct, setDisplayPct] = useState(0)
   const [celebrate, setCelebrate] = useState<number | null>(null)
@@ -103,6 +107,10 @@ export function Header({
   }, [globalPct, lastThreshold])
 
   const glowColor = SUBJECT_COLORS[dominantSubject?.key ?? "psico"]
+  const nextExam = useMemo(
+    () => activeExams.filter((exam) => daysRemaining(exam) >= 0).sort((a, b) => daysRemaining(a) - daysRemaining(b))[0],
+    [activeExams],
+  )
 
   return (
     <motion.header
@@ -120,6 +128,7 @@ export function Header({
           <h1 className="mt-1.5 text-[22px] font-semibold tracking-tight text-white">
             Pianificatore Studio
           </h1>
+          {nextExam && <p className="mt-1 text-[11px] text-stone-300">Prossimo: {nextExam.name} · {countdownLabel(nextExam)} · {nextExam.examDate}</p>}
         </div>
 
         <AnimatePresence>
@@ -147,14 +156,17 @@ export function Header({
           )}
         </AnimatePresence>
 
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={onOpenSettings}
-          className="group relative mt-0.5 flex flex-shrink-0 items-center gap-1.5 rounded-full border bg-white/10 px-3 py-1.5 text-[11px] font-medium text-white shadow-sm transition-all hover:bg-white/15 hover:shadow"
-          aria-label="Impostazioni notifiche"
-        >
-          <Settings size={12} strokeWidth={2.25} />
-        </motion.button>
+        <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
+          <ThemeToggle />
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={onOpenSettings}
+            className="group relative flex items-center gap-1.5 rounded-full border bg-white/10 px-3 py-1.5 text-[11px] font-medium text-white shadow-sm transition-all hover:bg-white/15 hover:shadow"
+            aria-label="Impostazioni notifiche"
+          >
+            <Settings size={12} strokeWidth={2.25} />
+          </motion.button>
+        </div>
       </div>
 
       {/* Progress card */}

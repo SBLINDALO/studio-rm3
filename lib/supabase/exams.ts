@@ -1,6 +1,6 @@
 import { supabase } from "./client"
-import type { ArchivedExam, CustomExam, DynamicExam } from "@/lib/planner/types"
-import { parseISODate } from "@/lib/planner/utils/dates"
+import type { ArchivedExam, CustomExam, DynamicExam, ExamDailyProgress } from "@/lib/planner/types"
+import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 import { calculateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
 
 async function getUserId() {
@@ -78,6 +78,28 @@ export async function updateExamMaterial(
   return getAllExams()
 }
 
+export async function saveExamDailyProgress(progress: Omit<ExamDailyProgress, "id" | "user_id" | "created_at">) {
+  const userId = await getUserId()
+  const { data, error } = await supabase
+    .from("exam_daily_progress")
+    .upsert({ user_id: userId, ...progress }, { onConflict: "user_id,exam_id,date" })
+    .select()
+    .single()
+  if (error) throw error
+  return data as ExamDailyProgress
+}
+
+export async function getExamDailyProgress(examId: string) {
+  await getUserId()
+  const { data, error } = await supabase
+    .from("exam_daily_progress")
+    .select("*")
+    .eq("exam_id", examId)
+    .order("date", { ascending: true })
+  if (error) throw error
+  return (data ?? []) as ExamDailyProgress[]
+}
+
 // Segna come completato/non completato un giorno del piano di studio
 export async function setDayCompletion(exam: DynamicExam, date: string, completed: boolean) {
   await getUserId()
@@ -90,7 +112,59 @@ export async function setDayCompletion(exam: DynamicExam, date: string, complete
       [date]: { ...day, completed, completedDate: completed ? date : undefined },
     },
   }
+  await saveExamDailyProgress({
+    exam_id: exam.id,
+    date,
+    pagesCompleted: day.pages ?? 0,
+    topicsCompleted: day.topics ?? [],
+    hoursStudied: completed ? day.hours.max : 0,
+    completed,
+    notes: null,
+  })
   const { error } = await supabase.from("dynamic_exams").update({ study_plan: studyPlan }).eq("id", exam.id)
   if (error) throw error
   return getAllExams()
+}
+
+export interface DailyProgressPoint {
+  date: string
+  pagesCompleted: number
+  topicsCompleted: number
+  hoursStudied: number
+  daysCompleted: number
+}
+
+// Aggrega exam_daily_progress degli ultimi `days` giorni (per grafico settimanale reale)
+export async function getWeeklyProgress(days = 7): Promise<DailyProgressPoint[]> {
+  const userId = await getUserId()
+  const today = new Date()
+  const from = new Date(today)
+  from.setDate(today.getDate() - (days - 1))
+
+  const { data, error } = await supabase
+    .from("exam_daily_progress")
+    .select("date, pagesCompleted, topicsCompleted, hoursStudied, completed")
+    .eq("user_id", userId)
+    .gte("date", formatISODate(from))
+    .lte("date", formatISODate(today))
+  if (error) throw error
+
+  const byDate = new Map<string, DailyProgressPoint>()
+  for (let i = 0; i < days; i++) {
+    const date = new Date(from)
+    date.setDate(from.getDate() + i)
+    const key = formatISODate(date)
+    byDate.set(key, { date: key, pagesCompleted: 0, topicsCompleted: 0, hoursStudied: 0, daysCompleted: 0 })
+  }
+
+  for (const row of data ?? []) {
+    const point = byDate.get(row.date)
+    if (!point) continue
+    point.pagesCompleted += row.pagesCompleted ?? 0
+    point.topicsCompleted += (row.topicsCompleted ?? []).length
+    point.hoursStudied += row.hoursStudied ?? 0
+    if (row.completed) point.daysCompleted += 1
+  }
+
+  return Array.from(byDate.values())
 }

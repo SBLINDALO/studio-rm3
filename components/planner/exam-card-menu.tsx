@@ -7,9 +7,10 @@ import { useEffect, useRef, useState } from "react"
 interface Props {
   onArchive: () => void
   onDelete: () => void
+  archiveLabel?: string
 }
 
-export function ExamCardMenu({ onArchive, onDelete }: Props) {
+export function ExamCardMenu({ onArchive, onDelete, archiveLabel = "Segna come dato" }: Props) {
   const [open, setOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -65,7 +66,7 @@ export function ExamCardMenu({ onArchive, onDelete }: Props) {
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-100"
             >
               <Archive size={16} />
-              Segna come dato
+              {archiveLabel}
             </button>
             <button
               type="button"

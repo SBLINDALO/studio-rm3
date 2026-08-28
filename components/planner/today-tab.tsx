@@ -33,6 +33,7 @@ interface Props {
   skippedCount: number
   onOpenCatchup: () => void
   onNavigate: (t: TabId) => void
+  onShowToast?: (msg: string, tone?: "success" | "warn" | "info" | "default") => void
 }
 
 export function TodayTab({
@@ -53,6 +54,7 @@ export function TodayTab({
   skippedCount,
   onOpenCatchup,
   onNavigate,
+  onShowToast,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const todayKey = getTodayStr()
@@ -76,6 +78,16 @@ export function TodayTab({
 
   return (
     <div className="space-y-5">
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setAddOpen(true)}
+        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-stone-900 text-white shadow-lg sm:right-[max(calc((100vw-680px)/2 + 16px),16px)]"
+        aria-label="Aggiungi esame rapidamente"
+        title="Quick Add"
+      >
+        <Plus size={22} />
+      </motion.button>
       <SkippedBanner count={skippedCount} onOpen={onOpenCatchup} />
 
       {/* Greeting card */}
@@ -239,7 +251,10 @@ export function TodayTab({
         <AddExamModal
           open={addOpen}
           onClose={() => setAddOpen(false)}
-          onAdd={addCustomExam}
+          onAdd={async (exam) => {
+            await addCustomExam(exam)
+            onShowToast?.("Esame aggiunto con successo", "success")
+          }}
         />
 
         {archivedExams.length > 0 && (

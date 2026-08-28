@@ -29,6 +29,19 @@ export interface DayLoad {
 
 export type BalancedSchedule = Record<string, DayLoad>
 
+export interface ExamDailyProgress {
+  id?: string
+  user_id?: string
+  exam_id: string
+  date: string
+  pagesCompleted: number
+  topicsCompleted: string[]
+  hoursStudied: number
+  completed: boolean
+  notes: string | null
+  created_at?: string
+}
+
 export interface StudyProgress {
   id: string
   user_id: string

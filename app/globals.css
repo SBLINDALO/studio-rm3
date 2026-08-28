@@ -253,6 +253,20 @@
 }
 
 @layer components {
+  .dark .bg-white\/90,
+  .dark .bg-white {
+    background-color: var(--surface);
+  }
+
+  .dark .text-stone-900 {
+    color: var(--fg);
+  }
+
+  .dark .text-stone-700,
+  .dark .text-stone-600 {
+    color: var(--fg-muted);
+  }
+
   /* Card base — sostituisce il pattern "border-black shadow-[..]" del Soft Pop */
   .card-quiet {
     @apply rounded-[16px] border border-stone-200 bg-[var(--surface)];

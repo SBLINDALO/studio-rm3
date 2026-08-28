@@ -121,6 +121,33 @@ CREATE POLICY "Users can insert own dynamic exams" ON dynamic_exams FOR INSERT W
 CREATE POLICY "Users can update own dynamic exams" ON dynamic_exams FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own dynamic exams" ON dynamic_exams FOR DELETE USING (auth.uid() = user_id);
 
+CREATE TABLE IF NOT EXISTS exam_daily_progress (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  exam_id UUID NOT NULL REFERENCES dynamic_exams(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  "pagesCompleted" INTEGER NOT NULL DEFAULT 0,
+  "topicsCompleted" JSONB NOT NULL DEFAULT '[]'::JSONB,
+  "hoursStudied" NUMERIC(4, 2) NOT NULL DEFAULT 0,
+  completed BOOLEAN NOT NULL DEFAULT FALSE,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, exam_id, date)
+);
+
+ALTER TABLE exam_daily_progress ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own exam daily progress" ON exam_daily_progress;
+DROP POLICY IF EXISTS "Users can insert own exam daily progress" ON exam_daily_progress;
+DROP POLICY IF EXISTS "Users can update own exam daily progress" ON exam_daily_progress;
+CREATE POLICY "Users can view own exam daily progress" ON exam_daily_progress FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own exam daily progress" ON exam_daily_progress FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own exam daily progress" ON exam_daily_progress FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+ALTER TABLE exam_daily_progress REPLICA IDENTITY FULL;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE exam_daily_progress;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 -- Policy per user_progress
 CREATE POLICY "Users can view own progress" ON user_progress
   FOR SELECT USING (auth.uid() = user_id);
