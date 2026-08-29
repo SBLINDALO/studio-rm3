@@ -1,11 +1,26 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronDown, ChevronUp, Flame } from "lucide-react"
+import { ChevronDown, ChevronUp, Flame, X } from "lucide-react"
 import { useExams } from "./exams-context"
 import { formatISODate } from "@/lib/planner/utils/dates"
 import { Checkbox } from "@/components/ui/checkbox"
+
+// Chiave per-giorno: gli esami nascosti si resettano automaticamente il giorno dopo
+function dismissedKey(day: string) {
+  return `studio-rm3.dismissed-today.${day}`
+}
+
+function loadDismissed(day: string): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try {
+    const raw = window.localStorage.getItem(dismissedKey(day))
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
 
 function computeStreak(exams: ReturnType<typeof useExams>["activeExams"]): number {
   const completedDates = new Set<string>()
@@ -31,13 +46,30 @@ export function TodayStudyPlan() {
   const { activeExams, loading, setDayCompletion } = useExams()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const today = formatISODate(new Date())
+  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed(today))
+
+  // Se cambia il giorno (es. tab lasciata aperta a mezzanotte) ricarica i dismiss del nuovo giorno
+  useEffect(() => {
+    setDismissed(loadDismissed(today))
+  }, [today])
+
+  const dismissExam = (examId: string) => {
+    setDismissed((prev) => {
+      const next = new Set(prev)
+      next.add(examId)
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(dismissedKey(today), JSON.stringify([...next]))
+      }
+      return next
+    })
+  }
 
   const todayTasks = useMemo(
     () =>
       activeExams
         .map((exam) => ({ exam, day: exam.studyPlan.dailySchedule[today] }))
-        .filter((entry) => entry.day),
-    [activeExams, today],
+        .filter((entry) => entry.day && !dismissed.has(entry.exam.id)),
+    [activeExams, today, dismissed],
   )
 
   const totals = useMemo(() => {
@@ -107,6 +139,15 @@ export function TodayStudyPlan() {
                     />
                     Fatto
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => dismissExam(exam.id)}
+                    aria-label="Rimuovi da oggi"
+                    title="Rimuovi solo da oggi"
+                    className="rounded-full p-1 text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
 
                 <AnimatePresence initial={false}>

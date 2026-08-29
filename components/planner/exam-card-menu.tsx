@@ -1,16 +1,17 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { Archive, MoreVertical, Trash2 } from "lucide-react"
+import { Archive, Edit3, MoreVertical, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
 interface Props {
   onArchive: () => void
   onDelete: () => void
+  onEdit?: () => void
   archiveLabel?: string
 }
 
-export function ExamCardMenu({ onArchive, onDelete, archiveLabel = "Segna come dato" }: Props) {
+export function ExamCardMenu({ onArchive, onDelete, onEdit, archiveLabel = "Segna come dato" }: Props) {
   const [open, setOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -56,6 +57,20 @@ export function ExamCardMenu({ onArchive, onDelete, archiveLabel = "Segna come d
             exit={{ opacity: 0, y: -8 }}
             className="mt-2 w-48 rounded-2xl border border-stone-200 bg-white p-2 shadow-xl"
           >
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEdit()
+                  setOpen(false)
+                  setConfirmDelete(false)
+                }}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+              >
+                <Edit3 size={16} />
+                Modifica
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

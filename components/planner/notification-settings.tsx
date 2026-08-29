@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Bell, BellOff, Settings, X } from "lucide-react"
 import { usePushNotifications } from "@/hooks/use-push-notifications"
@@ -8,11 +8,23 @@ import { usePushNotifications } from "@/hooks/use-push-notifications"
 interface Props {
   isOpen: boolean
   onClose: () => void
+  appName: string
+  onChangeAppName: (name: string) => void
 }
 
-export function NotificationSettings({ isOpen, onClose }: Props) {
+export function NotificationSettings({ isOpen, onClose, appName, onChangeAppName }: Props) {
   const { isSupported, enabled, permission, requestPermission, toggleEnabled } = usePushNotifications()
   const [loading, setLoading] = useState(false)
+  const [nameDraft, setNameDraft] = useState(appName)
+
+  useEffect(() => {
+    setNameDraft(appName)
+  }, [appName])
+
+  const commitName = () => {
+    const trimmed = nameDraft.trim()
+    onChangeAppName(trimmed || "Il mio piano di studio")
+  }
 
   const handleToggle = async () => {
     if (permission === 'default') {
@@ -48,12 +60,22 @@ export function NotificationSettings({ isOpen, onClose }: Props) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-stone-900">Impostazioni Notifiche</h3>
+                <h3 className="text-lg font-semibold text-stone-900">Impostazioni</h3>
                 <button onClick={onClose} className="p-1">
                   <X size={20} className="text-stone-500" />
                 </button>
               </div>
-              <p className="text-stone-600">
+              <label className="block text-sm font-medium text-stone-900">
+                Nome app / sessione
+                <input
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onBlur={commitName}
+                  placeholder="Es. Il mio piano di studio"
+                  className="mt-1 w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900"
+                />
+              </label>
+              <p className="mt-4 text-stone-600">
                 Le notifiche push non sono supportate su questo browser.
               </p>
             </motion.div>
@@ -81,11 +103,22 @@ export function NotificationSettings({ isOpen, onClose }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-stone-900">Impostazioni Notifiche</h3>
+              <h3 className="text-lg font-semibold text-stone-900">Impostazioni</h3>
               <button onClick={onClose} className="p-1">
                 <X size={20} className="text-stone-500" />
               </button>
             </div>
+
+            <label className="mb-4 block text-sm font-medium text-stone-900">
+              Nome app / sessione
+              <input
+                value={nameDraft}
+                onChange={(event) => setNameDraft(event.target.value)}
+                onBlur={commitName}
+                placeholder="Es. Il mio piano di studio"
+                className="mt-1 w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-900"
+              />
+            </label>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">

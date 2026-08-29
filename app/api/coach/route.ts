@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
   const contextMd = renderSnapshotAsMarkdown(snapshot)
 
-  const system = `Sei "Coach", assistente di studio personale per uno studente di Roma Tre.
+  const system = `Sei "Coach", assistente di studio personale.
 Parli SEMPRE in italiano, in modo diretto, empatico e concreto. Eviti elenchi lunghissimi.
 Risposte brevi (max 4-6 frasi o 5 bullet). Non fare disclaimer inutili.
 Quando l'utente chiede cosa studiare oggi, basa la risposta sul piano qui sotto.

@@ -26,6 +26,7 @@ interface Props {
   onOpenCatchup: () => void
   onOpenSettings: () => void
   getProgress: (sub: SubjectKey) => { done: number; total: number; pct: number }
+  appName: string
 }
 
 export function Header({
@@ -36,6 +37,7 @@ export function Header({
   onOpenCatchup,
   onOpenSettings,
   getProgress,
+  appName,
 }: Props) {
   const { activeExams } = useExams()
   const [expanded, setExpanded] = useState(false)
@@ -123,7 +125,7 @@ export function Header({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.15em] text-stone-200">
             <GraduationCap size={11} strokeWidth={2} />
-            Roma Tre · Sessione Estiva 2026
+            {appName}
           </div>
           <h1 className="mt-1.5 text-[22px] font-semibold tracking-tight text-white">
             Pianificatore Studio
@@ -162,7 +164,7 @@ export function Header({
             whileTap={{ scale: 0.95 }}
             onClick={onOpenSettings}
             className="group relative flex items-center gap-1.5 rounded-full border bg-white/10 px-3 py-1.5 text-[11px] font-medium text-white shadow-sm transition-all hover:bg-white/15 hover:shadow"
-            aria-label="Impostazioni notifiche"
+            aria-label="Impostazioni"
           >
             <Settings size={12} strokeWidth={2.25} />
           </motion.button>

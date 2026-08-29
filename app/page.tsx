@@ -47,6 +47,7 @@ function PlannerPageContent() {
     attachDoc,
     removeDoc,
     addCustomExam,
+    updateExam,
     removeExam,
     archiveExam,
     restoreExam,
@@ -56,6 +57,7 @@ function PlannerPageContent() {
   } = usePlanner()
 
   const [tab, setTab] = usePersistedState<TabId>("ui.tab", "today")
+  const [appName, setAppName] = usePersistedState<string>("app.sessionName", "Il mio piano di studio")
   const [toast, setToast] = useState<ToastState | null>(null)
   const [catchupOpen, setCatchupOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
@@ -333,6 +335,11 @@ function PlannerPageContent() {
     }
   }, [loaded, skippedItems.length, showToast])
 
+  // Titolo di pagina personalizzabile dalle impostazioni
+  useEffect(() => {
+    if (typeof document !== "undefined") document.title = appName
+  }, [appName])
+
   // Loading state
   if (!loaded) {
     return (
@@ -386,6 +393,8 @@ function PlannerPageContent() {
       <NotificationSettings
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        appName={appName}
+        onChangeAppName={setAppName}
       />
 
       <Header
@@ -396,6 +405,7 @@ function PlannerPageContent() {
         onOpenCatchup={() => setCatchupOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         getProgress={getProgress}
+        appName={appName}
       />
 
       <main className="px-3.5 py-4">
@@ -415,6 +425,7 @@ function PlannerPageContent() {
                 attachDoc={attachDoc}
                 removeDoc={removeDoc}
                 addCustomExam={addCustomExam}
+                updateExam={updateExam}
                 archiveExam={archiveExam}
                 removeExam={removeExam}
                 restoreExam={restoreExam}

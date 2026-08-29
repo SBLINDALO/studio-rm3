@@ -87,9 +87,12 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onOnline = () => flushPendingProgress()
     window.addEventListener("online", onOnline)
+    // Sottoscrive sia i progressi giornalieri che gli esami stessi (insert/update/delete)
+    // così ogni consumer di useExams() si aggiorna subito, indipendentemente da chi ha scritto
     const channel = supabase
       .channel("exam-daily-progress-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "exam_daily_progress" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "dynamic_exams" }, () => refresh())
       .subscribe()
     flushPendingProgress()
     return () => {

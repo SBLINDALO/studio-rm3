@@ -10,9 +10,11 @@ import { StudyDocViewer } from "./study-doc-viewer"
 import { daysUntil, fmtDuration, getTodayStr } from "@/lib/planner/helpers"
 import { getDayItems } from "@/lib/planner/catchup"
 import { AddExamModal } from "./add-exam-modal"
+import { EditExamModal } from "./edit-exam-modal"
 import { ExamArchive } from "./exam-archive"
 import { ExamCardMenu } from "./exam-card-menu"
-import type { ArchivedExam, DynamicExam, SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
+import { TodayStudyPlan } from "@/components/exams/today-study-plan"
+import type { ArchivedExam, CustomExam, DynamicExam, SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
 import type { TabId } from "./tabs-nav"
 
 interface Props {
@@ -22,6 +24,7 @@ interface Props {
   attachDoc: (key: string, doc: StudyDoc) => void
   removeDoc: (key: string) => void
   addCustomExam: (exam: Omit<DynamicExam, "id" | "createdAt" | "status">) => void | Promise<void>
+  updateExam: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material">>) => void | Promise<void>
   archiveExam: (id: string) => void
   removeExam: (id: string) => void
   restoreExam: (id: string) => void
@@ -43,6 +46,7 @@ export function TodayTab({
   attachDoc,
   removeDoc,
   addCustomExam,
+  updateExam,
   archiveExam,
   removeExam,
   restoreExam,
@@ -57,6 +61,7 @@ export function TodayTab({
   onShowToast,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false)
+  const [editingExam, setEditingExam] = useState<CustomExam | null>(null)
   const todayKey = getTodayStr()
   const items = getDayItems(todayKey, data)
   const customExams = data.customExams ?? []
@@ -209,7 +214,11 @@ export function TodayTab({
                   style={{ background: exam.color.dot }}
                   aria-hidden
                 />
-                <ExamCardMenu onArchive={() => archiveExam(exam.id)} onDelete={() => removeExam(exam.id)} />
+                <ExamCardMenu
+                  onArchive={() => archiveExam(exam.id)}
+                  onDelete={() => removeExam(exam.id)}
+                  onEdit={() => setEditingExam(exam)}
+                />
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: exam.color.text }}>
                     {exam.short || exam.name}
@@ -257,12 +266,24 @@ export function TodayTab({
           }}
         />
 
+        <EditExamModal
+          exam={editingExam}
+          onClose={() => setEditingExam(null)}
+          onSave={async (exam, updates) => {
+            await updateExam(exam, updates)
+            onShowToast?.("Esame aggiornato", "success")
+          }}
+        />
+
         {archivedExams.length > 0 && (
           <div className="mt-4">
             <ExamArchive archivedExams={archivedExams} onRestore={restoreExam} />
           </div>
         )}
       </section>
+
+      {/* Piano di studio degli esami per oggi */}
+      <TodayStudyPlan />
 
       {/* Today's program */}
       <section>

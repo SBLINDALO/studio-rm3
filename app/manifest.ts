@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Pianificatore Studio Roma Tre 2026",
-    short_name: "Studio RM3",
+    name: "Pianificatore Studio",
+    short_name: "Studio Planner",
     description:
-      "Pianificatore di studio interattivo per la sessione estiva 2026",
+      "Pianificatore di studio interattivo e personalizzabile",
     start_url: "/",
     scope: "/",
     display: "standalone",

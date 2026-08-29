@@ -17,15 +17,15 @@ const _geistMono = V0_Font_Geist_Mono({ subsets: ['latin'], weight: ["100","200"
 const _sourceSerif_4 = V0_Font_Source_Serif_4({ subsets: ['latin'], weight: ["200","300","400","500","600","700","800","900"] })
 
 export const metadata: Metadata = {
-  title: 'Pianificatore Studio · Roma Tre 2026',
+  title: 'Pianificatore Studio',
   description:
-    'Pianificatore di studio interattivo per la sessione estiva 2026: timer Pomodoro, tracker argomenti, piano settimanale e verifiche di fine settimana.',
+    'Pianificatore di studio interattivo e personalizzabile: timer Pomodoro, tracker argomenti, piano settimanale e verifiche di fine settimana.',
   generator: 'v0.app',
-  applicationName: 'Studio RM3',
+  applicationName: 'Studio Planner',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Studio RM3',
+    title: 'Studio Planner',
   },
   formatDetection: {
     telephone: false,
@@ -75,7 +75,7 @@ export default function RootLayout({
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Studio RM3" />
+        <meta name="apple-mobile-web-app-title" content="Studio Planner" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-sans antialiased">

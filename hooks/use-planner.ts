@@ -5,7 +5,7 @@ import type { ArchivedExam, CatchupItem, CustomExam, DynamicExam, PlannerData, S
 import { SUBJECTS, TOPICS } from "@/lib/planner/data"
 import { getTodayStr } from "@/lib/planner/helpers"
 import { useSupabaseSync } from "./use-supabase-sync"
-import { getAllExams, addCustomExam as addExamToSupabase, removeExam as removeExamFromSupabase, archiveExam as archiveExamToSupabase, restoreExam as restoreExamFromSupabase } from "@/lib/supabase/exams"
+import { getAllExams, addCustomExam as addExamToSupabase, removeExam as removeExamFromSupabase, archiveExam as archiveExamToSupabase, restoreExam as restoreExamFromSupabase, updateExamMaterial as updateExamInSupabase } from "@/lib/supabase/exams"
 import { getStudyProgress, updateChapterProgress as updateChapterProgressInSupabase, getDailyStats, getStreak } from "@/lib/supabase/study-progress"
 import type { StudyProgress } from "@/lib/supabase/client"
 
@@ -264,12 +264,20 @@ export function usePlanner() {
 
   const addCustomExam = useCallback(
     async (exam: Omit<DynamicExam, "id" | "createdAt" | "status">) => {
-      try {
-        const result = await addExamToSupabase(exam)
-        setData(prev => ({ ...prev, ...result }))
-      } catch (error) {
-        console.error('Error adding custom exam:', error)
-      }
+      // Non intercettare l'errore qui: deve propagarsi al chiamante (form) per essere mostrato all'utente
+      const result = await addExamToSupabase(exam)
+      setData(prev => ({ ...prev, ...result }))
+    },
+    [],
+  )
+
+  const updateExam = useCallback(
+    async (
+      exam: DynamicExam,
+      updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material">>,
+    ) => {
+      const result = await updateExamInSupabase(exam, updates)
+      setData(prev => ({ ...prev, ...result }))
     },
     [],
   )
@@ -515,6 +523,7 @@ export function usePlanner() {
     attachDoc,
     removeDoc,
     addCustomExam,
+    updateExam,
     removeExam,
     archiveExam,
     restoreExam,
