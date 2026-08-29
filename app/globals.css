@@ -58,7 +58,23 @@
   --radius-md: 1rem;      /* 16px — card */
   --radius-lg: 1.25rem;   /* 20px — card grandi */
   --radius-xl: 1.5rem;    /* 24px — modali */
+  --radius-2xl: 1.75rem;  /* 28px — bottom sheet, superfici flottanti */
   --radius-full: 9999px;
+
+  /* Tipografia — gerarchia esplicita, non tutto a 16px */
+  --text-display: 1.75rem;   /* 28px — titolo di pagina */
+  --text-title: 1.375rem;    /* 22px — titolo sezione principale */
+  --text-heading: 1rem;      /* 16px — header di sezione/card */
+  --text-card-title: 0.9375rem; /* 15px — titolo card */
+  --text-body: 0.8125rem;    /* 13px — testo corpo */
+  --text-caption: 0.6875rem; /* 11px — didascalie, meta */
+  --text-micro: 0.625rem;    /* 10px — etichette uppercase */
+
+  /* Materiali "Liquid Glass" — riempimento translucido + bordo sottile + blur */
+  --glass-fill: color-mix(in oklch, var(--surface) 68%, transparent);
+  --glass-fill-strong: color-mix(in oklch, var(--surface) 82%, transparent);
+  --glass-border: color-mix(in oklch, white 55%, transparent);
+  --glass-blur: 22px;
 
   /* Ombre stratificate — sostituiscono gli hard-offset del Soft Pop */
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
@@ -147,6 +163,11 @@
   --shadow-lg:
     0 8px 16px -4px rgb(0 0 0 / 0.40),
     0 16px 32px -8px rgb(0 0 0 / 0.50);
+
+  /* Materiali dark: più opachi per garantire contrasto WCAG AA sulla translucenza */
+  --glass-fill: color-mix(in oklch, var(--surface) 78%, transparent);
+  --glass-fill-strong: color-mix(in oklch, var(--surface) 90%, transparent);
+  --glass-border: color-mix(in oklch, white 12%, transparent);
 
   --background: var(--bg);
   --foreground: var(--fg);
@@ -292,11 +313,67 @@
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium;
   }
 
-  /* Glass surface — per modali e drawer */
+  /* Glass surface — linguaggio "Liquid Glass": riempimento translucido + bordo sottile + ombra morbida */
   .glass {
-    background: color-mix(in oklch, var(--surface-elevated) 80%, transparent);
-    backdrop-filter: blur(15px) saturate(160%);
-    -webkit-backdrop-filter: blur(15px) saturate(160%);
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Variante più opaca per sheet/modali dove serve massima leggibilità del testo */
+  .glass-strong {
+    background: var(--glass-fill-strong);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Variante per elementi flottanti circolari (FAB) */
+  .glass-fab {
+    background: var(--glass-fill-strong);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Scala tipografica — gerarchia esplicita per titoli, header, corpo, didascalie */
+  .text-page-title {
+    font-size: var(--text-display);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .text-section-title {
+    font-size: var(--text-title);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+  .text-section-header {
+    font-size: var(--text-micro);
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .text-card-title {
+    font-size: var(--text-card-title);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+  .text-body {
+    font-size: var(--text-body);
+    font-weight: 400;
+    line-height: 1.45;
+  }
+  .text-caption {
+    font-size: var(--text-caption);
+    font-weight: 500;
+    line-height: 1.3;
   }
 
   .progress-shimmer {
@@ -340,4 +417,15 @@
   /* Nasconde lo scrollbar mantenendo lo scroll */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+}
+
+/* Rete di sicurezza per le animazioni CSS pure (fuori da Framer Motion, che è già
+   gestito via <MotionConfig reducedMotion="user">): tutto diventa istantaneo. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

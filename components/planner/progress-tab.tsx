@@ -8,6 +8,8 @@ import { useExams } from "@/components/exams/exams-context"
 import { computeExamProgress } from "@/components/exams/exam-utils"
 import { getWeeklyProgress, type DailyProgressPoint } from "@/lib/supabase/exams"
 import { exportFullProgressReportPdf } from "@/lib/planner/pdf-report"
+import { Skeleton } from "@/components/ui/skeleton"
+import { SPRING_FILL, staggerSpring } from "@/lib/planner/motion"
 
 interface Props {
   data: PlannerData
@@ -94,7 +96,15 @@ export function ProgressTab({ data, dailyStats, streak }: Props) {
           <h3 className="text-[14px] font-semibold text-stone-900">Progressi settimanali</h3>
         </div>
         {weeklyLoading ? (
-          <p className="text-[12px] text-stone-400">Caricamento…</p>
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-3 w-8" />
+                <Skeleton className="h-2 flex-1 rounded-full" />
+                <Skeleton className="h-3 w-8" />
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="space-y-3">
             {weeklyProgress.map((point) => {
@@ -104,11 +114,13 @@ export function ProgressTab({ data, dailyStats, streak }: Props) {
                 <div key={point.date} className="flex items-center gap-3">
                   <div className="w-8 text-[12px] font-medium text-stone-500">{label}</div>
                   <div className="flex-1">
-                    <div className="h-2 bg-stone-200 rounded-full">
-                      <div
-                        className="h-2 bg-blue-500 rounded-full transition-all duration-500"
-                        style={{ width: `${(point.hoursStudied / maxHours) * 100}%` }}
-                      ></div>
+                    <div className="h-2 bg-stone-200 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(point.hoursStudied / maxHours) * 100}%` }}
+                        transition={SPRING_FILL}
+                        className="h-2 bg-blue-500 rounded-full"
+                      />
                     </div>
                   </div>
                   <div className="text-[12px] text-stone-600 tabular-nums">{point.hoursStudied.toFixed(1)}h</div>
@@ -142,20 +154,25 @@ export function ProgressTab({ data, dailyStats, streak }: Props) {
           )}
         </div>
         {examProgress.length === 0 ? (
-          <p className="text-[12px] text-stone-400">Nessun esame attivo da mostrare.</p>
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--border)] px-4 py-6 text-center">
+            <TrendingUp size={20} className="text-stone-400" strokeWidth={1.75} />
+            <p className="text-[12px] text-stone-400">Nessun esame attivo da mostrare.</p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {examProgress.map(({ exam, progress }) => (
+            {examProgress.map(({ exam, progress }, i) => (
               <div key={exam.id} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] font-medium text-stone-700">{exam.name}</span>
                   <span className="text-[12px] text-stone-500">{progress.daysDone}/{progress.daysTotal}</span>
                 </div>
-                <div className="h-2 bg-stone-200 rounded-full">
-                  <div
-                    className="h-2 bg-green-500 rounded-full transition-all duration-500"
-                    style={{ width: `${progress.completionPct}%` }}
-                  ></div>
+                <div className="h-2 bg-stone-200 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress.completionPct}%` }}
+                    transition={staggerSpring(i, 0.05)}
+                    className="h-2 bg-green-500 rounded-full"
+                  />
                 </div>
                 <div className="text-right text-[10px] text-stone-500">{progress.completionPct}% completato</div>
               </div>

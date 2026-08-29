@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Check, CalendarClock, Timer as TimerIcon, CheckCircle2, RotateCw, ArrowRight, Plus } from "lucide-react"
+import { Check, CalendarClock, Timer as TimerIcon, CheckCircle2, RotateCw, ArrowRight, Plus, X, Archive } from "lucide-react"
 import { useState } from "react"
 import { SUBJECTS, C, DAILY, BOOKINGS } from "@/lib/planner/data"
 import { SubjectIcon } from "./subject-icon"
@@ -12,8 +12,21 @@ import { getDayItems } from "@/lib/planner/catchup"
 import { AddExamModal } from "./add-exam-modal"
 import { EditExamModal } from "./edit-exam-modal"
 import { ExamArchive } from "./exam-archive"
-import { ExamCardMenu } from "./exam-card-menu"
 import { TodayStudyPlan } from "@/components/exams/today-study-plan"
+import { PullToRefresh } from "./pull-to-refresh"
+import { SwipeToDelete } from "./swipe-to-delete"
+import { useExams } from "@/components/exams/exams-context"
+import { staggerSpring } from "@/lib/planner/motion"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import type { ArchivedExam, CustomExam, DynamicExam, SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
 import type { TabId } from "./tabs-nav"
 
@@ -62,6 +75,9 @@ export function TodayTab({
 }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [editingExam, setEditingExam] = useState<CustomExam | null>(null)
+  const [deletingExam, setDeletingExam] = useState<CustomExam | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const { refresh: refreshDynamicExams } = useExams()
   const todayKey = getTodayStr()
   const items = getDayItems(todayKey, data)
   const customExams = data.customExams ?? []
@@ -81,30 +97,59 @@ export function TodayTab({
     return d !== null && d >= 0
   })
 
+  const confirmDeleteExam = async () => {
+    if (!deletingExam) return
+    setDeleteBusy(true)
+    try {
+      await removeExam(deletingExam.id)
+      onShowToast?.("Esame eliminato", "success")
+      setDeletingExam(null)
+    } catch (err) {
+      onShowToast?.(err instanceof Error ? err.message : "Impossibile eliminare l'esame. Riprova.", "warn")
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
+  const handleArchiveExam = async (exam: CustomExam) => {
+    try {
+      await archiveExam(exam.id)
+      onShowToast?.("Esame segnato come dato", "success")
+    } catch (err) {
+      onShowToast?.(err instanceof Error ? err.message : "Impossibile aggiornare l'esame. Riprova.", "warn")
+    }
+  }
+
   return (
     <div className="space-y-5">
       <motion.button
         type="button"
-        whileTap={{ scale: 0.95 }}
+        initial={{ scale: 0, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 280, damping: 22 }}
+        whileTap={{ scale: 0.94 }}
         onClick={() => setAddOpen(true)}
-        className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-stone-900 text-white shadow-lg sm:right-[max(calc((100vw-680px)/2 + 16px),16px)]"
+        className="glass-fab fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full text-stone-900 dark:text-white sm:right-[max(calc((100vw-680px)/2 + 16px),16px)]"
         aria-label="Aggiungi esame rapidamente"
         title="Quick Add"
       >
         <Plus size={22} />
       </motion.button>
+      <PullToRefresh onRefresh={refreshDynamicExams}>
+      <div className="space-y-5">
       <SkippedBanner count={skippedCount} onOpen={onOpenCatchup} />
 
       {/* Greeting card */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={staggerSpring(0)}
         className="card-quiet p-4"
       >
-        <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+        <div className="text-section-header text-stone-500">
           {displayTodayLabel} · Giorno {currentDayNumber} di {totalStudyDays}
         </div>
-        <h2 className="mt-1.5 text-[22px] font-semibold tracking-tight text-stone-900">
+        <h2 className="text-page-title mt-1.5 text-stone-900">
           Buono studio
         </h2>
         <div className="mt-0.5 text-[12px] text-stone-500">
@@ -127,11 +172,12 @@ export function TodayTab({
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={staggerSpring(1)}
         className="card-quiet p-4"
       >
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+            <div className="text-section-header text-stone-500">
               Progressi oggi
             </div>
             <div className="mt-1 text-[14px] text-stone-700">
@@ -157,23 +203,24 @@ export function TodayTab({
 
       {/* Countdown grid */}
       <section>
-        <h3 className="mb-2 px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+        <h3 className="text-section-header mb-2 px-0.5 text-stone-500">
           Giorni agli esami
         </h3>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           {(Object.entries(SUBJECTS) as [SubjectKey, (typeof SUBJECTS)[SubjectKey]][]).map(([k, s], i) => {
             const d = daysUntil(s.examISO)
             const urgent = d !== null && d <= 7
             return (
               <motion.div
                 key={k}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-                className="card-quiet relative overflow-hidden p-3"
+                initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={staggerSpring(i)}
+                className="relative overflow-hidden rounded-[20px] border border-[var(--border-subtle)] p-3.5 shadow-sm"
+                style={{ background: `color-mix(in oklch, ${C[k].dot} 7%, var(--surface))` }}
               >
                 <div
-                  className="absolute left-0 top-0 h-full w-0.5"
+                  className="absolute left-0 top-0 h-full w-[3px]"
                   style={{ background: C[k].dot }}
                   aria-hidden
                 />
@@ -185,13 +232,13 @@ export function TodayTab({
                   <span className="truncate">{s.short}</span>
                 </div>
                 <div
-                  className={`mt-0.5 text-[28px] font-semibold tabular-nums tracking-tight ${
-                    urgent ? "text-rose-600" : "text-stone-900"
+                  className={`mt-1 text-[34px] font-semibold tabular-nums leading-none tracking-tight ${
+                    urgent ? "text-rose-600" : "text-stone-900 dark:text-white"
                   }`}
                 >
                   {d ?? "—"}
                 </div>
-                <div className="text-[10px] text-stone-500">
+                <div className="mt-1 text-[10.5px] text-stone-500">
                   {d !== null ? `giorni · ${s.examDate}` : s.examDate}
                 </div>
               </motion.div>
@@ -204,51 +251,85 @@ export function TodayTab({
             return (
               <motion.div
                 key={exam.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.04 }}
-                className="card-quiet relative overflow-hidden p-3"
+                initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={staggerSpring(Object.keys(SUBJECTS).length + i)}
               >
-                <div
-                  className="absolute left-0 top-0 h-full w-0.5"
-                  style={{ background: exam.color.dot }}
-                  aria-hidden
-                />
-                <ExamCardMenu
-                  onArchive={() => archiveExam(exam.id)}
-                  onDelete={() => removeExam(exam.id)}
-                  onEdit={() => setEditingExam(exam)}
-                />
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: exam.color.text }}>
-                    {exam.short || exam.name}
+                <SwipeToDelete onDelete={() => setDeletingExam(exam)} ariaLabel={`Elimina ${exam.name}`}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setEditingExam(exam)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") setEditingExam(exam)
+                    }}
+                    className="relative border border-[var(--border-subtle)] p-3.5 text-left shadow-sm"
+                    style={{ background: `color-mix(in oklch, ${exam.color.dot} 7%, var(--surface))` }}
+                  >
+                    <div
+                      className="absolute left-0 top-0 h-full w-[3px]"
+                      style={{ background: exam.color.dot }}
+                      aria-hidden
+                    />
+                    <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleArchiveExam(exam)
+                        }}
+                        className="rounded-full border border-stone-200 bg-white/90 p-1.5 text-stone-400 shadow-sm transition hover:bg-stone-100 hover:text-stone-600"
+                        aria-label="Segna come dato"
+                        title="Segna come dato"
+                      >
+                        <Archive size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setDeletingExam(exam)
+                        }}
+                        className="rounded-full border border-stone-200 bg-white/90 p-1.5 text-stone-400 shadow-sm transition hover:bg-rose-50 hover:text-rose-600"
+                        aria-label="Elimina esame"
+                        title="Elimina esame"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 pr-14">
+                      <div className="text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: exam.color.text }}>
+                        {exam.short || exam.name}
+                      </div>
+                      <span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-stone-600">
+                        {exam.examType}
+                      </span>
+                    </div>
+                    <div
+                      className={`mt-1.5 text-[34px] font-semibold tabular-nums leading-none tracking-tight ${
+                        urgent ? "text-rose-600" : "text-stone-900 dark:text-white"
+                      }`}
+                    >
+                      {d ?? "—"}
+                    </div>
+                    <div className="mt-1 text-[10.5px] text-stone-500">{d !== null ? `giorni · ${exam.examDate}` : exam.examDate}</div>
+                    <div className="mt-0.5 text-[10.5px] text-stone-500">{exam.examTime}</div>
+                    {exam.studyPlan?.planStatus === "too-late" && (
+                      <div className="mt-2 text-[11px] font-medium text-rose-600">
+                        Esame troppo vicino: ti mostriamo solo cosa rivedere subito.
+                      </div>
+                    )}
                   </div>
-                  <span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-stone-600">
-                    {exam.examType}
-                  </span>
-                </div>
-                <div
-                  className={`mt-2 text-[28px] font-semibold tabular-nums tracking-tight ${
-                    urgent ? "text-rose-600" : "text-stone-900"
-                  }`}
-                >
-                  {d ?? "—"}
-                </div>
-                <div className="text-[10px] text-stone-500">{d !== null ? `giorni · ${exam.examDate}` : exam.examDate}</div>
-                <div className="mt-1 text-[10px] text-stone-500">{exam.examTime}</div>
-                {exam.studyPlan?.planStatus === "too-late" && (
-                  <div className="mt-2 text-[11px] font-medium text-rose-600">
-                    Esame troppo vicino: ti mostriamo solo cosa rivedere subito.
-                  </div>
-                )}
+                </SwipeToDelete>
               </motion.div>
             )
           })}
 
+
           <motion.button
             whileTap={{ scale: 0.98 }}
             onClick={() => setAddOpen(true)}
-            className="card-quiet group relative flex min-h-[150px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-stone-300 bg-white/90 px-4 py-5 text-stone-500 transition hover:border-stone-400 hover:bg-stone-50"
+            className="group relative flex min-h-[150px] flex-col items-center justify-center gap-3 rounded-[20px] border border-dashed border-stone-300 bg-[var(--bg-subtle)] px-4 py-5 text-stone-500 transition hover:border-stone-400 hover:bg-stone-100/60"
           >
             <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-stone-200 bg-stone-100 text-stone-500">
               <Plus size={32} />
@@ -257,23 +338,27 @@ export function TodayTab({
           </motion.button>
         </div>
 
-        <AddExamModal
-          open={addOpen}
-          onClose={() => setAddOpen(false)}
-          onAdd={async (exam) => {
-            await addCustomExam(exam)
-            onShowToast?.("Esame aggiunto con successo", "success")
-          }}
-        />
-
-        <EditExamModal
-          exam={editingExam}
-          onClose={() => setEditingExam(null)}
-          onSave={async (exam, updates) => {
-            await updateExam(exam, updates)
-            onShowToast?.("Esame aggiornato", "success")
-          }}
-        />
+        <AlertDialog open={!!deletingExam} onOpenChange={(open) => !open && setDeletingExam(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminare definitivamente {deletingExam?.name}?</AlertDialogTitle>
+              <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteBusy}>Annulla</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault()
+                  confirmDeleteExam()
+                }}
+                disabled={deleteBusy}
+                className="bg-rose-600 text-white hover:bg-rose-700"
+              >
+                {deleteBusy ? "Eliminazione…" : "Elimina definitivamente"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {archivedExams.length > 0 && (
           <div className="mt-4">
@@ -287,7 +372,7 @@ export function TodayTab({
 
       {/* Today's program */}
       <section>
-        <h3 className="mb-2 px-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+        <h3 className="text-section-header mb-2 px-0.5 text-stone-500">
           Programma di oggi
         </h3>
         <div className="space-y-1.5">
@@ -300,7 +385,7 @@ export function TodayTab({
                 key={isCatchup ? `c_${task.catchupId}` : `p_${task.plannedIdx}`}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
+                transition={staggerSpring(i, 0.05)}
                 className="card-quiet card-quiet-hover relative flex w-full items-start gap-3 overflow-hidden p-3"
               >
                 <div
@@ -409,6 +494,26 @@ export function TodayTab({
           </div>
         </motion.div>
       )}
+      </div>
+      </PullToRefresh>
+
+      <AddExamModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdd={async (exam) => {
+          await addCustomExam(exam)
+          onShowToast?.("Esame aggiunto con successo", "success")
+        }}
+      />
+
+      <EditExamModal
+        exam={editingExam}
+        onClose={() => setEditingExam(null)}
+        onSave={async (exam, updates) => {
+          await updateExam(exam, updates)
+          onShowToast?.("Esame aggiornato", "success")
+        }}
+      />
     </div>
   )
 }

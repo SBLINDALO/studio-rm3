@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, MotionConfig } from "framer-motion"
 import { RotateCw } from "lucide-react"
 
 import { usePlanner } from "@/hooks/use-planner"
@@ -25,6 +25,7 @@ import { NotificationSettings } from "@/components/planner/notification-settings
 import { Toast, type ToastState } from "@/components/planner/toast"
 import { scanSkipped } from "@/lib/planner/catchup"
 import { ExamsProvider } from "@/components/exams/exams-context"
+import { ensureAnonymousSession } from "@/lib/supabase/session"
 
 function PlannerPageContent() {
   const {
@@ -56,8 +57,16 @@ function PlannerPageContent() {
     streak,
   } = usePlanner()
 
-  const [tab, setTab] = usePersistedState<TabId>("ui.tab", "today")
+  // Non persistito: l'app deve sempre aprirsi sulla Home ("Oggi"), non sull'ultima tab visitata
+  const [tab, setTab] = useState<TabId>("today")
   const [appName, setAppName] = usePersistedState<string>("app.sessionName", "Il mio piano di studio")
+
+  // Sessione anonima automatica: nessun login, invisibile all'utente
+  useEffect(() => {
+    ensureAnonymousSession().catch(() => {
+      // Fallimenti vengono ritentati e segnalati al momento della scrittura (vedi lib/supabase/exams.ts)
+    })
+  }, [])
   const [toast, setToast] = useState<ToastState | null>(null)
   const [catchupOpen, setCatchupOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
@@ -343,18 +352,21 @@ function PlannerPageContent() {
   // Loading state
   if (!loaded) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-        >
-          <RotateCw size={32} className="text-neutral-600" strokeWidth={3} />
-        </motion.div>
-      </div>
+      <MotionConfig reducedMotion="user">
+        <div className="flex h-screen items-center justify-center bg-background">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+          >
+            <RotateCw size={32} className="text-neutral-600" strokeWidth={3} />
+          </motion.div>
+        </div>
+      </MotionConfig>
     )
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="relative mx-auto min-h-screen max-w-[680px] overflow-x-hidden bg-background pb-24 antialiased">
       <FocusView
         open={focusView}
@@ -490,6 +502,7 @@ function PlannerPageContent() {
 
       <TabsNav tab={tab} onChange={setTab} />
     </div>
+    </MotionConfig>
   )
 }
 

@@ -6,6 +6,7 @@ import { useState } from "react"
 import type { DynamicExam } from "@/lib/planner/types"
 import { calculateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
 import { formatISODate } from "@/lib/planner/utils/dates"
+import { SPRING_SHEET } from "@/lib/planner/motion"
 
 interface Props {
   open: boolean
@@ -52,9 +53,19 @@ export function AddExamModal({ open, onClose, onAdd }: Props) {
   }
 
   return <AnimatePresence>{open && <>
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
-    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-[680px] rounded-t-3xl bg-white px-5 pb-10 pt-4 shadow-2xl">
-      <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300" />
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close} className="fixed inset-0 z-50 bg-black/35 backdrop-blur-md" />
+    <motion.div
+      initial={{ y: "100%", opacity: 0.5 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: "100%", opacity: 0.5 }}
+      transition={SPRING_SHEET}
+      drag="y"
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={{ top: 0, bottom: 0.2 }}
+      onDragEnd={(_, info) => { if (info.offset.y > 120 || info.velocity.y > 550) close() }}
+      className="glass-strong fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-[680px] rounded-t-[var(--radius-2xl)] px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-4"
+    >
+      <div className="mx-auto mb-3 h-1.5 w-11 rounded-full bg-stone-400/50" />
       <div className="flex items-center justify-between pb-3"><h2 className="text-[18px] font-semibold text-stone-900">Nuovo esame</h2><button onClick={close} aria-label="Chiudi"><X size={18} /></button></div>
       <div className="space-y-3">
         <label className="block text-xs font-medium text-stone-600">Nome<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Es. Storia dell'arte" /></label>

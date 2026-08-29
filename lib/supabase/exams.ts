@@ -1,13 +1,26 @@
 import { supabase } from "./client"
+import { ensureAnonymousSession } from "./session"
 import type { ArchivedExam, CustomExam, DynamicExam, ExamDailyProgress } from "@/lib/planner/types"
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 import { calculateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
 
+// Non deve mai propagare l'errore grezzo di Supabase ("Auth session missing!") all'utente:
+// se la sessione manca prova a ristabilirla una volta, poi fallisce con un messaggio chiaro.
 async function getUserId() {
-  const { data, error } = await supabase.auth.getUser()
-  if (error) throw error
-  if (!data.user) throw new Error("È necessario effettuare l'accesso per gestire gli esami")
-  return data.user.id
+  const first = await supabase.auth.getUser()
+  if (!first.error && first.data.user) return first.data.user.id
+
+  try {
+    await ensureAnonymousSession()
+  } catch {
+    throw new Error("Impossibile connettersi al servizio di salvataggio. Controlla la connessione e riprova.")
+  }
+
+  const retry = await supabase.auth.getUser()
+  if (retry.error || !retry.data.user) {
+    throw new Error("Sessione non disponibile. Ricarica la pagina e riprova.")
+  }
+  return retry.data.user.id
 }
 
 function toCustomExam(exam: DynamicExam, index: number): CustomExam {

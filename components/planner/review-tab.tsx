@@ -2,11 +2,13 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Check, AlertTriangle, X, FileText } from "lucide-react"
-import { WEEKS, SUBJECTS, C, PHASE_COLOR } from "@/lib/planner/data"
-import { SubjectIcon } from "./subject-icon"
+import { Check, AlertTriangle, X, FileText, Gauge } from "lucide-react"
+import { WEEKS, PHASE_COLOR } from "@/lib/planner/data"
 import { StatsView } from "./stats-view"
-import type { PlannerData, SubjectKey } from "@/lib/planner/types"
+import type { PlannerData } from "@/lib/planner/types"
+import { useExams } from "@/components/exams/exams-context"
+import { Skeleton } from "@/components/ui/skeleton"
+import { SPRING_SHEET } from "@/lib/planner/motion"
 
 interface Props {
   data: PlannerData
@@ -26,7 +28,16 @@ const OPTIONS = [
   { label: "No", Icon: X, toneActive: "bg-rose-500 text-white", tone: "text-rose-600" },
 ] as const
 
+const EXAM_COLORS = [
+  { text: "#0f766e", dot: "#14b8a6" },
+  { text: "#1d4ed8", dot: "#3b82f6" },
+  { text: "#b45309", dot: "#f59e0b" },
+  { text: "#be123c", dot: "#f43f5e" },
+  { text: "#6d28d9", dot: "#8b5cf6" },
+] as const
+
 export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
+  const { activeExams, loading: examsLoading } = useExams()
   const [selectedWeek, setSelectedWeek] = useState(0)
   const wk = WEEKS[selectedWeek]
   const phaseColor = PHASE_COLOR[wk.phase]
@@ -64,7 +75,7 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
         key={selectedWeek}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={SPRING_SHEET}
         className="card-quiet overflow-hidden"
       >
         <div
@@ -121,16 +132,28 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
             <div className="text-[12.5px] font-medium text-stone-900">
               Confidenza per materia <span className="text-stone-500">(1–5)</span>
             </div>
-            {(Object.entries(SUBJECTS) as [SubjectKey, (typeof SUBJECTS)[SubjectKey]][]).map(([k, s]) => {
-              const confKey = `${selectedWeek}_${k}`
+            {examsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-8 w-full rounded-md" />
+              </div>
+            ) : activeExams.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--border)] px-4 py-6 text-center">
+                <Gauge size={20} className="text-stone-400" strokeWidth={1.75} />
+                <p className="text-[12px] text-stone-400">Nessun esame attivo da verificare.</p>
+              </div>
+            ) : activeExams.map((exam, index) => {
+              const confKey = `${selectedWeek}_${exam.id}`
               const val = data.conf[confKey] || 0
+              const color = EXAM_COLORS[index % EXAM_COLORS.length]
               return (
-                <div key={k}>
+                <div key={exam.id}>
                   <div
                     className="mb-1.5 flex items-center gap-1.5 text-[11.5px] font-medium"
-                    style={{ color: C[k].text }}
+                    style={{ color: color.text }}
                   >
-                    <SubjectIcon sub={k} size={11} strokeWidth={2} /> {s.short}
+                    <span className="h-2 w-2 rounded-full" style={{ background: color.dot }} aria-hidden />
+                    {exam.name}
                   </div>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map((v) => {
@@ -142,9 +165,9 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
                           onClick={() => setConf(confKey, v)}
                           className="flex-1 rounded-md border py-2 text-[12px] font-semibold transition-all"
                           style={{
-                            background: active ? C[k].dot : "white",
-                            color: active ? "white" : C[k].text,
-                            borderColor: active ? C[k].dot : "var(--border)",
+                            background: active ? color.dot : "white",
+                            color: active ? "white" : color.text,
+                            borderColor: active ? color.dot : "var(--border)",
                           }}
                         >
                           {v}

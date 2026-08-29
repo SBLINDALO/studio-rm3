@@ -297,36 +297,30 @@ export function usePlanner() {
 
   const removeExam = useCallback(
     async (id: string) => {
-      try {
-        const { customExams, archivedExams, dynamicExams } = await removeExamFromSupabase(id)
-        setData(prev => ({
-          ...prev,
-          customExams,
-          archivedExams,
-          dynamicExams,
-          docs: cleanExamDocs(id),
-        }))
-      } catch (error) {
-        console.error('Error removing exam:', error)
-      }
+      // Non intercettare l'errore qui: deve propagarsi al chiamante per mostrare un errore reale, mai un successo finto
+      const { customExams, archivedExams, dynamicExams } = await removeExamFromSupabase(id)
+      setData(prev => ({
+        ...prev,
+        customExams,
+        archivedExams,
+        dynamicExams,
+        docs: cleanExamDocs(id),
+      }))
     },
     [cleanExamDocs],
   )
 
   const archiveExam = useCallback(
     async (id: string) => {
-      try {
-        const { customExams, archivedExams, dynamicExams } = await archiveExamToSupabase(id)
-        setData(prev => ({
-          ...prev,
-          customExams,
-          archivedExams,
-          dynamicExams,
-          docs: cleanExamDocs(id),
-        }))
-      } catch (error) {
-        console.error('Error archiving exam:', error)
-      }
+      // Non intercettare l'errore qui: deve propagarsi al chiamante per mostrare un errore reale, mai un successo finto
+      const { customExams, archivedExams, dynamicExams } = await archiveExamToSupabase(id)
+      setData(prev => ({
+        ...prev,
+        customExams,
+        archivedExams,
+        dynamicExams,
+        docs: cleanExamDocs(id),
+      }))
     },
     [cleanExamDocs],
   )

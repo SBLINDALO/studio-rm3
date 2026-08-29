@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronDown, ChevronUp, Flame, X } from "lucide-react"
+import { ChevronDown, ChevronUp, Flame, ListChecks, X } from "lucide-react"
 import { useExams } from "./exams-context"
 import { formatISODate } from "@/lib/planner/utils/dates"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Skeleton } from "@/components/ui/skeleton"
+import { SPRING_DEFAULT, SPRING_FILL, staggerSpring } from "@/lib/planner/motion"
 
 // Chiave per-giorno: gli esami nascosti si resettano automaticamente il giorno dopo
 function dismissedKey(day: string) {
@@ -80,44 +82,96 @@ export function TodayStudyPlan() {
 
   const streak = useMemo(() => computeStreak(activeExams), [activeExams])
 
-  if (loading) return <div className="p-4 text-sm text-stone-500">Caricamento piano di oggi…</div>
+  if (loading) {
+    return (
+      <section className="glass rounded-[var(--radius-2xl)] p-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-6 w-16 rounded-full" />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Skeleton className="h-14 rounded-2xl" />
+          <Skeleton className="h-14 rounded-2xl" />
+        </div>
+        <Skeleton className="mt-3 h-16 rounded-2xl" />
+      </section>
+    )
+  }
 
   return (
-    <section className="rounded-3xl border border-stone-200 bg-white/90 p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-stone-900">Piano di oggi</h2>
-        <div className="flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-semibold text-orange-600">
+    <section
+      className="relative overflow-hidden rounded-[var(--radius-2xl)] border p-4 shadow-md"
+      style={{
+        background: "linear-gradient(155deg, color-mix(in oklch, var(--accent-info) 12%, var(--surface)), var(--surface) 55%)",
+        borderColor: "color-mix(in oklch, var(--accent-info) 20%, var(--border-subtle))",
+      }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full opacity-30 blur-3xl"
+        style={{ background: "var(--accent-info)" }}
+      />
+      <div className="relative flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white shadow-sm"
+            style={{ background: "var(--accent-info)" }}
+            aria-hidden
+          >
+            <ListChecks size={15} strokeWidth={2.25} />
+          </span>
+          <div>
+            <div className="text-section-header text-stone-500">Obiettivi di oggi</div>
+            <h2 className="text-card-title text-stone-900 dark:text-white">Piano di oggi</h2>
+          </div>
+        </div>
+        <motion.div
+          key={streak}
+          initial={{ scale: 0.85 }}
+          animate={{ scale: 1 }}
+          transition={SPRING_DEFAULT}
+          className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-[11px] font-semibold text-orange-600"
+        >
           <Flame size={14} />
           {streak} {streak === 1 ? "giorno" : "giorni"}
-        </div>
+        </motion.div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-2xl bg-stone-50 p-3">
+      <div className="relative mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-2xl bg-[var(--surface)]/70 p-3">
           <div className="text-[10px] uppercase tracking-[0.14em] text-stone-400">Pagine totali</div>
-          <div className="mt-1 text-lg font-semibold text-stone-900">{totals.totalPages}</div>
+          <div className="mt-1 text-lg font-semibold text-stone-900 dark:text-white">{totals.totalPages}</div>
         </div>
-        <div className="rounded-2xl bg-stone-50 p-3">
+        <div className="rounded-2xl bg-[var(--surface)]/70 p-3">
           <div className="text-[10px] uppercase tracking-[0.14em] text-stone-400">Ore consigliate</div>
-          <div className="mt-1 text-lg font-semibold text-stone-900">{totals.totalHours.toFixed(1)}h</div>
+          <div className="mt-1 text-lg font-semibold text-stone-900 dark:text-white">{totals.totalHours.toFixed(1)}h</div>
         </div>
       </div>
 
       {totals.totalHours > 1.5 && (
-        <div role="alert" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+        <div role="alert" className="relative mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
           Il carico di oggi supera 1,5 ore consigliate.
         </div>
       )}
 
       {todayTasks.length === 0 ? (
-        <p className="mt-4 text-sm text-stone-500">Nessun compito pianificato per oggi.</p>
+        <div className="relative mt-4 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)]/60 px-4 py-6 text-center">
+          <ListChecks size={20} className="text-stone-400" strokeWidth={1.75} />
+          <p className="text-sm text-stone-500">Nessun compito pianificato per oggi.</p>
+        </div>
       ) : (
-        <div className="mt-3 space-y-2">
-          {todayTasks.map(({ exam, day }) => {
+        <div className="relative mt-3 space-y-2">
+          {todayTasks.map(({ exam, day }, i) => {
             if (!day) return null
             const isOpen = expanded[exam.id] ?? true
             return (
-              <div key={exam.id} className="rounded-2xl border border-stone-200 p-3">
+              <motion.div
+                key={exam.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={staggerSpring(i)}
+                className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-3"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
@@ -125,7 +179,7 @@ export function TodayStudyPlan() {
                     className="flex flex-1 items-center gap-2 text-left"
                   >
                     {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    <span className="text-sm font-medium text-stone-900">{exam.name}</span>
+                    <span className="text-sm font-medium text-stone-900 dark:text-white">{exam.name}</span>
                     {day.isReview && (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                         Ripasso
@@ -156,6 +210,7 @@ export function TodayStudyPlan() {
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
+                      transition={SPRING_FILL}
                       className="overflow-hidden"
                     >
                       <div className="mt-2 text-xs text-stone-600">
@@ -166,7 +221,7 @@ export function TodayStudyPlan() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
+              </motion.div>
             )
           })}
         </div>
