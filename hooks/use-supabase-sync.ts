@@ -1,8 +1,24 @@
 import { useCallback, useEffect, useState } from "react"
 import { supabase, type UserProgress } from "@/lib/supabase/client"
+import { ensureAnonymousSession } from "@/lib/supabase/session"
 import type { SubjectKey, LoggedSession, CatchupItem } from "@/lib/planner/types"
 
 type SyncStatus = "idle" | "syncing" | "error"
+
+// Prova a ottenere l'utente della sessione corrente; se manca, tenta di ristabilirla
+// una volta con la sessione anonima prima di rinunciare (mai una scrittura "persa"
+// solo perché la sessione non era ancora pronta al primo tentativo).
+async function resolveSyncUser() {
+  const first = await supabase.auth.getUser()
+  if (first.data.user) return first.data.user
+  try {
+    await ensureAnonymousSession()
+  } catch {
+    return null
+  }
+  const retry = await supabase.auth.getUser()
+  return retry.data.user
+}
 
 /**
  * Hook per sincronizzare il progresso con Supabase
@@ -41,7 +57,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = { user: await resolveSyncUser() }
 
         // Se non loggato, usa localStorage
         if (!user.user) {
@@ -88,7 +104,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = { user: await resolveSyncUser() }
 
         if (!user.user) {
           saveTopicQuizToLocalStorage(subject, topicIndex, notesData)
@@ -404,7 +420,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = { user: await resolveSyncUser() }
         if (!user.user) {
           saveDailyToLocalStorage(dayStr, sessionIndex, isDone)
           setSyncStatus("idle")
@@ -450,7 +466,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = { user: await resolveSyncUser() }
         if (!user.user) {
           saveNoteToLocalStorage(weekIdx, note)
           setSyncStatus("idle")
@@ -495,7 +511,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = { user: await resolveSyncUser() }
         if (!user.user) {
           saveConfToLocalStorage(key, value)
           setSyncStatus("idle")
@@ -540,7 +556,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = { user: await resolveSyncUser() }
         if (!user.user) {
           saveCheckToLocalStorage(key, value)
           setSyncStatus("idle")
@@ -585,7 +601,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = { user: await resolveSyncUser() }
         if (!user.user) {
           saveSessionToLocalStorage(session)
           setSyncStatus("idle")
@@ -631,7 +647,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = { user: await resolveSyncUser() }
         if (!user.user) {
           saveCatchupToLocalStorage(catchup)
           setSyncStatus("idle")

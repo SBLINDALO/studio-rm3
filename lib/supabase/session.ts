@@ -19,3 +19,23 @@ export function ensureAnonymousSession(): Promise<void> {
   }
   return bootstrapPromise
 }
+
+// Restituisce l'id utente della sessione anonima corrente, garantendo che esista.
+// Non deve mai propagare l'errore grezzo di Supabase ("Auth session missing!") all'utente:
+// se la sessione manca prova a ristabilirla una volta, poi fallisce con un messaggio chiaro.
+export async function getUserId(): Promise<string> {
+  const first = await supabase.auth.getUser()
+  if (!first.error && first.data.user) return first.data.user.id
+
+  try {
+    await ensureAnonymousSession()
+  } catch {
+    throw new Error("Impossibile connettersi al servizio di salvataggio. Controlla la connessione e riprova.")
+  }
+
+  const retry = await supabase.auth.getUser()
+  if (retry.error || !retry.data.user) {
+    throw new Error("Sessione non disponibile. Ricarica la pagina e riprova.")
+  }
+  return retry.data.user.id
+}
