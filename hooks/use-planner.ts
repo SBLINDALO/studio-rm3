@@ -7,6 +7,7 @@ import { getTodayStr } from "@/lib/planner/helpers"
 import { useSupabaseSync } from "./use-supabase-sync"
 import { getAllExams, addCustomExam as addExamToSupabase, removeExam as removeExamFromSupabase, archiveExam as archiveExamToSupabase, restoreExam as restoreExamFromSupabase, updateExamMaterial as updateExamInSupabase } from "@/lib/supabase/exams"
 import { getStudyProgress, updateChapterProgress as updateChapterProgressInSupabase, getDailyStats, getStreak } from "@/lib/supabase/study-progress"
+import { getUserId } from "@/lib/supabase/session"
 import type { StudyProgress } from "@/lib/supabase/client"
 
 const STORAGE_KEY = "planner5v3"
@@ -112,7 +113,6 @@ export function usePlanner() {
         parsed.catchup = [...parsed.catchup, ...newCatchup]
 
         // Carica esami da Supabase
-        const userId = "test-user"
         try {
           const { customExams, archivedExams, dynamicExams } = await getAllExams()
           parsed.customExams = customExams
@@ -125,15 +125,29 @@ export function usePlanner() {
           parsed.archivedExams = []
         }
 
+        // Risolve l'id utente della sessione anonima reale (mai un id fittizio):
+        // se non disponibile, le letture di study progress/statistiche vengono saltate
+        // ma non vengono mai mascherate da un id inventato.
+        let userId: string | null = null
+        try {
+          userId = await getUserId()
+        } catch (sessionError) {
+          console.error('Error resolving user session:', sessionError)
+        }
+
         // Carica study progress da Supabase
         try {
-          // Per ora, carica tutto; in futuro, filtra per esami attivi
-          const allProgress: StudyProgress[] = []
-          for (const exam of parsed.customExams) {
-            const progress = await getStudyProgress(userId, exam.id)
-            allProgress.push(...progress)
+          if (userId) {
+            // Per ora, carica tutto; in futuro, filtra per esami attivi
+            const allProgress: StudyProgress[] = []
+            for (const exam of parsed.customExams) {
+              const progress = await getStudyProgress(userId, exam.id)
+              allProgress.push(...progress)
+            }
+            parsed.studyProgress = allProgress
+          } else {
+            parsed.studyProgress = []
           }
-          parsed.studyProgress = allProgress
         } catch (progressError) {
           console.error('Error loading study progress:', progressError)
           parsed.studyProgress = []
@@ -144,12 +158,14 @@ export function usePlanner() {
 
         // Calcola statistiche giornaliere e streak
         try {
-          const [stats, streakValue] = await Promise.all([
-            getDailyStats(userId, getTodayStr()),
-            getStreak(userId)
-          ])
-          setDailyStats(stats)
-          setStreak(streakValue)
+          if (userId) {
+            const [stats, streakValue] = await Promise.all([
+              getDailyStats(userId, getTodayStr()),
+              getStreak(userId)
+            ])
+            setDailyStats(stats)
+            setStreak(streakValue)
+          }
         } catch (statsError) {
           console.error('Error loading stats:', statsError)
         }
@@ -344,23 +360,19 @@ export function usePlanner() {
 
   const updateChapterProgress = useCallback(
     async (examId: string, chapterId: string, status: "not_started" | "in_progress" | "completed", timeSpent?: number) => {
-      try {
-        const userId = "test-user"
-        const updatedProgress = await updateChapterProgressInSupabase(userId, examId, chapterId, status, timeSpent)
-        setData(prev => ({
-          ...prev,
-          studyProgress: prev.studyProgress.map(p => p.id === updatedProgress.id ? updatedProgress : p)
-        }))
-        // Ricarica statistiche
-        const [stats, streakValue] = await Promise.all([
-          getDailyStats(userId, getTodayStr()),
-          getStreak(userId)
-        ])
-        setDailyStats(stats)
-        setStreak(streakValue)
-      } catch (error) {
-        console.error('Error updating chapter progress:', error)
-      }
+      const userId = await getUserId()
+      const updatedProgress = await updateChapterProgressInSupabase(userId, examId, chapterId, status, timeSpent)
+      setData(prev => ({
+        ...prev,
+        studyProgress: prev.studyProgress.map(p => p.id === updatedProgress.id ? updatedProgress : p)
+      }))
+      // Ricarica statistiche
+      const [stats, streakValue] = await Promise.all([
+        getDailyStats(userId, getTodayStr()),
+        getStreak(userId)
+      ])
+      setDailyStats(stats)
+      setStreak(streakValue)
     },
     [],
   )

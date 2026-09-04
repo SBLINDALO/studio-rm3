@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function NotificationSettings({ isOpen, onClose, appName, onChangeAppName }: Props) {
-  const { isSupported, enabled, permission, requestPermission, toggleEnabled } = usePushNotifications()
+  const { isSupported, enabled, permission, error, requestPermission, toggleEnabled } = usePushNotifications()
   const [loading, setLoading] = useState(false)
   const [nameDraft, setNameDraft] = useState(appName)
 
@@ -147,6 +147,12 @@ export function NotificationSettings({ isOpen, onClose, appName, onChangeAppName
                   )}
                 </button>
               </div>
+
+              {error && (
+                <div className="rounded-lg bg-red-50 p-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
 
               {permission === 'denied' && (
                 <div className="rounded-lg bg-red-50 p-3">
