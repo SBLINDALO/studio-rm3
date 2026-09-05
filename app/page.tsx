@@ -463,7 +463,7 @@ function PlannerPageContent() {
               />
             )}
             {tab === "tracker" && (
-              <TrackerTab data={data} quiz={data.quiz} toggleTopic={handleToggleTopic} saveTopicQuiz={saveTopicQuiz} getProgress={getProgress} />
+              <TrackerTab />
             )}
             {tab === "review" && (
               <ReviewTab data={data} setCheck={setCheck} setConf={setConf} setNote={setNote} />

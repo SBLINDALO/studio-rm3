@@ -40,7 +40,7 @@ function preserveProgress(
   return generated
 }
 
-function calculateMaterialQuantity(material: DynamicExam["material"]): { pages: number; topics: string[] } {
+export function calculateMaterialQuantity(material: DynamicExam["material"]): { pages: number; topics: string[] } {
   const pdfPages = (material.files?.length ?? 0) * PAGES_PER_PDF_ESTIMATE
   const pages = Math.max(0, material.totalPages ?? 0) + pdfPages
   const topics = material.notes?.split("\n").map((topic) => topic.trim()).filter(Boolean) ?? []

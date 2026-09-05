@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronDown, ChevronUp, Flame, ListChecks, X } from "lucide-react"
+import { ChevronDown, ChevronUp, FastForward, Flame, ListChecks, X } from "lucide-react"
 import { useExams } from "./exams-context"
 import { formatISODate } from "@/lib/planner/utils/dates"
-import { balanceStudyLoad } from "@/lib/planner/algorithms/load-balancer"
+import { computeBalancedSchedule } from "@/lib/planner/algorithms/load-balancer"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SPRING_DEFAULT, SPRING_FILL, staggerSpring } from "@/lib/planner/motion"
@@ -46,7 +46,7 @@ function computeStreak(exams: ReturnType<typeof useExams>["activeExams"]): numbe
 }
 
 export function TodayStudyPlan() {
-  const { activeExams, loading, setDayCompletion } = useExams()
+  const { activeExams, loading, markDayAheadAsCompleted, setDayCompletion } = useExams()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const today = formatISODate(new Date())
   const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed(today))
@@ -81,8 +81,10 @@ export function TodayStudyPlan() {
     return { totalPages, totalHours }
   }, [todayTasks])
 
-  // Carico odierno per esame, solo informativo: spostare cosa è sempre una scelta dell'utente
-  const todayLoad = useMemo(() => balanceStudyLoad({ exams: activeExams })[today], [activeExams, today])
+  // READ-ONLY: somma ore/pagine del giorno solo per il banner di overload.
+  // Nessuna scrittura su Supabase: il ribilanciamento viene persistito solo dopo
+  // aggiunta/modifica/completamento esame (persistRebalancedActiveExams in lib/supabase/exams.ts).
+  const todayLoad = useMemo(() => computeBalancedSchedule(activeExams)[today], [activeExams, today])
 
   const streak = useMemo(() => computeStreak(activeExams), [activeExams])
 
@@ -154,7 +156,7 @@ export function TodayStudyPlan() {
 
       {todayLoad?.isOverload && (
         <div role="alert" className="relative mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-          Il carico di oggi supera 1,5 ore consigliate ({todayLoad.totalHours.toFixed(1)}h da {todayLoad.exams.length} {todayLoad.exams.length === 1 ? "esame" : "esami"}: {todayLoad.exams.map((e) => e.examName).join(", ")}). Valuta tu cosa spostare.
+          Il carico di oggi supera il tetto di 4 ore ({todayLoad.totalHours.toFixed(1)}h da {todayLoad.exams.length} {todayLoad.exams.length === 1 ? "esame" : "esami"}: {todayLoad.exams.map((e) => e.examName).join(", ")}). Le ore manuali restano invariate.
         </div>
       )}
 
@@ -197,6 +199,15 @@ export function TodayStudyPlan() {
                     />
                     Fatto
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => { void markDayAheadAsCompleted(exam.id, today) }}
+                    className="rounded-full p-1 text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"
+                    aria-label="Segna completato il prossimo giorno perché hai studiato il doppio"
+                    title="Ho studiato il doppio"
+                  >
+                    <FastForward size={14} />
+                  </button>
                   <button
                     type="button"
                     onClick={() => dismissExam(exam.id)}

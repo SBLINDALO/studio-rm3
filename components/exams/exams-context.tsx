@@ -11,6 +11,7 @@ import {
   restoreExam as restoreExamFromSupabase,
   updateExamMaterial as updateExamMaterialInSupabase,
   setDayCompletion as setDayCompletionInSupabase,
+  markDayAheadAsCompleted as markDayAheadAsCompletedInSupabase,
 } from "@/lib/supabase/exams"
 
 interface ExamsContextValue {
@@ -22,8 +23,9 @@ interface ExamsContextValue {
   archiveExam: (id: string) => Promise<void>
   removeExam: (id: string) => Promise<void>
   restoreExam: (id: string) => Promise<void>
-  updateExamMaterial: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>) => Promise<void>
+  updateExamMaterial: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">>) => Promise<void>
   setDayCompletion: (exam: DynamicExam, date: string, completed: boolean) => Promise<void>
+  markDayAheadAsCompleted: (examId: string, date: string) => Promise<void>
 }
 
 type PendingDailyProgress = Omit<ExamDailyProgress, "id" | "user_id" | "created_at">
@@ -117,7 +119,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateExamMaterial = useCallback(
-    async (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>) => {
+    async (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">>) => {
       const { dynamicExams } = await updateExamMaterialInSupabase(exam, updates)
       setExams(dynamicExams)
     },
@@ -174,6 +176,11 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const markDayAheadAsCompleted = useCallback(async (examId: string, date: string) => {
+    const { dynamicExams } = await markDayAheadAsCompletedInSupabase(examId, date)
+    setExams(dynamicExams)
+  }, [])
+
   const activeExams = useMemo(() => exams.filter((exam) => exam.status === "active"), [exams])
 
   const value: ExamsContextValue = {
@@ -187,6 +194,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
     restoreExam,
     updateExamMaterial,
     setDayCompletion,
+    markDayAheadAsCompleted,
   }
 
   return <ExamsContext.Provider value={value}>{children}</ExamsContext.Provider>

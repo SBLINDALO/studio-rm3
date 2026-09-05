@@ -6,7 +6,7 @@ export interface StudyPlan {
   planStatus?: "ready" | "review-only" | "too-late"
   totalDaysAvailable: number
   studyDaysPerWeek: 5
-  hoursPerDay: { min: 1; max: 1.5 }
+  hoursPerDay: { min: number; max: number }
   reviewDaysBefore: 4
   dailySchedule: Record<string, {
     pages?: number
@@ -14,6 +14,7 @@ export interface StudyPlan {
     topics?: string[]
     completed: boolean
     completedDate?: string
+    manual?: boolean
     isReview?: boolean
   }>
   totalPagesPerDay?: number
@@ -215,6 +216,7 @@ export interface CustomExam {
   examDate: string
   examTime: string
   examType: "Scritto" | "Orale"
+  cfu?: DynamicExam["cfu"]
   examISO: string
   color: { bg: string; border: string; text: string; dot: string; soft: string }
   material?: DynamicExam["material"]

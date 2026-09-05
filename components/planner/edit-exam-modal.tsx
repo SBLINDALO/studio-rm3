@@ -4,12 +4,13 @@ import { AnimatePresence, motion } from "framer-motion"
 import { FileText, Save, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import type { CustomExam, DynamicExam } from "@/lib/planner/types"
+import { formatISODate } from "@/lib/planner/utils/dates"
 import { SPRING_SHEET } from "@/lib/planner/motion"
 
 interface Props {
   exam: CustomExam | null
   onClose: () => void
-  onSave: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material">>) => void | Promise<void>
+  onSave: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">>) => void | Promise<void>
 }
 
 const materialTypes: Array<{ value: DynamicExam["material"]["type"]; label: string }> = [
@@ -32,6 +33,7 @@ const cfuOptions: Array<{ value: NonNullable<DynamicExam["cfu"]>; label: string 
 export function EditExamModal({ exam, onClose, onSave }: Props) {
   const [name, setName] = useState("")
   const [date, setDate] = useState("")
+  const [startDate, setStartDate] = useState("")
   const [type, setType] = useState<DynamicExam["material"]["type"]>("pages")
   const [examType, setExamType] = useState<NonNullable<DynamicExam["examType"]>>("Scritto")
   const [cfu, setCfu] = useState<NonNullable<DynamicExam["cfu"]>>(6)
@@ -44,6 +46,7 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
     if (!exam) return
     setName(exam.name)
     setDate(exam.examISO)
+    setStartDate(exam.startDate ?? "")
     setType(exam.material?.type ?? "pages")
     setExamType(exam.examType === "Orale" ? "Orale" : "Scritto")
     setCfu(exam.cfu === 12 ? 12 : 6)
@@ -58,6 +61,7 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
 
   const save = async () => {
     if (!name.trim() || !date) { setError("Inserisci nome e data dell'esame"); return }
+    if (startDate && startDate > date) { setError("L'inizio studio non può essere dopo la data dell'esame"); return }
     const material: DynamicExam["material"] = {
       type,
       totalPages: pages ? Number(pages) : undefined,
@@ -88,7 +92,9 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
 
     setSaving(true)
     try {
-      await onSave(dynamicExam, { name: name.trim(), examDate: date, material, examType, cfu })
+      const updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">> = { name: name.trim(), examDate: date, material, examType, cfu }
+      if (startDate && startDate !== exam.startDate) updates.startDate = startDate
+      await onSave(dynamicExam, updates)
       close()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Impossibile salvare le modifiche")
@@ -115,6 +121,7 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
       <div className="space-y-3">
         <label className="block text-xs font-medium text-stone-600">Nome<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Es. Storia dell'arte" /></label>
         <label className="block text-xs font-medium text-stone-600">Data esame<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" /></label>
+        <label className="block text-xs font-medium text-stone-600">Inizio studio<input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" />{exam.startDate && date > exam.examISO && exam.startDate < formatISODate(new Date()) && (!startDate || startDate === exam.startDate) && <span className="mt-1 block text-[11px] leading-snug text-amber-700">Data esame posticipata: l'inizio studio verrà riportato a oggi e il piano ripartirà da adesso. Per conservare la cronologia passata, imposta manualmente l'inizio studio a oggi.</span>}</label>
         <div><p className="mb-1 text-xs font-medium text-stone-600">Tipo esame</p><div className="grid grid-cols-2 gap-2">{examTypes.map((item) => <button type="button" key={item.value} onClick={() => setExamType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${examType === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         <div><p className="mb-1 text-xs font-medium text-stone-600">CFU</p><div className="grid grid-cols-2 gap-2">{cfuOptions.map((item) => <button type="button" key={item.value} onClick={() => setCfu(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${cfu === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         <div><p className="mb-1 text-xs font-medium text-stone-600">Materiale</p><div className="grid grid-cols-4 gap-2">{materialTypes.map((item) => <button type="button" key={item.value} onClick={() => setType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${type === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>

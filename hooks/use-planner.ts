@@ -274,7 +274,7 @@ export function usePlanner() {
   const updateExam = useCallback(
     async (
       exam: DynamicExam,
-      updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>,
+      updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">>,
     ) => {
       const result = await updateExamInSupabase(exam, updates)
       setData(prev => ({ ...prev, ...result }))

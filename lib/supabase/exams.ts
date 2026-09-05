@@ -3,6 +3,7 @@ import { ensureAnonymousSession } from "./session"
 import type { ArchivedExam, CustomExam, DynamicExam, ExamDailyProgress, StudyPlan } from "@/lib/planner/types"
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 import { calculateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
+import { computeRebalancedExams } from "@/lib/planner/algorithms/load-balancer"
 
 // Non deve mai propagare l'errore grezzo di Supabase ("Auth session missing!") all'utente:
 // se la sessione manca prova a ristabilirla una volta, poi fallisce con un messaggio chiaro.
@@ -31,7 +32,7 @@ function toCustomExam(exam: DynamicExam, index: number): CustomExam {
     { bg: "#ECFDF5", border: "#6EE7B7", text: "#065F46", dot: "#10B981", soft: "#F7FCF9" },
   ]
   const formattedDate = parseISODate(exam.examDate).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })
-  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examDate: formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1), examTime: "—", examType: exam.examType ?? "Scritto", examISO: exam.examDate, color: colors[index % colors.length], material: exam.material, chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [], createdAt: exam.createdAt, startDate: exam.startDate, studyPlan: exam.studyPlan, status: exam.status }
+  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examDate: formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1), examTime: "—", examType: exam.examType ?? "Scritto", cfu: exam.cfu, examISO: exam.examDate, color: colors[index % colors.length], material: exam.material, chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [], createdAt: exam.createdAt, startDate: exam.startDate, studyPlan: exam.studyPlan, status: exam.status }
 }
 
 function toArchivedExam(exam: DynamicExam): ArchivedExam {
@@ -63,6 +64,7 @@ export async function addCustomExam(exam: Omit<DynamicExam, "id" | "createdAt" |
     console.error("[addCustomExam] insert su dynamic_exams fallita:", { message: error.message, code: error.code, details: error.details, hint: error.hint })
     throw error
   }
+  await persistRebalancedActiveExams()
   return getAllExams()
 }
 
@@ -84,23 +86,58 @@ export async function restoreExam(id: string) {
   await getUserId()
   const { error } = await supabase.from("dynamic_exams").update({ status: "active" }).eq("id", id)
   if (error) throw error
+  // Il ripristino re-inserisce l'esame nel pool attivo: equivale a un'aggiunta ai fini del carico
+  await persistRebalancedActiveExams()
   return getAllExams()
 }
 
-// Aggiorna nome/data/materiale di un esame e ricalcola il piano preservando i giorni già completati
+// Aggiorna nome/date/materiale di un esame e ricalcola il piano preservando i giorni già completati.
+// Se l'utente posticipa examDate oltre la finestra originale (es. vecchio esame di giugno
+// spostato a novembre 2027), startDate arretrata viene riportata a oggi: il nuovo piano
+// riparte da adesso invece che da mesi fa. I completamenti passati non vanno persi perché
+// preserveProgress() li conserva solo per date presenti nel nuovo schedule (>= startDate).
+// Chi preferisce preservare la cronologia passata deve fissare startDate a oggi dal modale.
 export async function updateExamMaterial(
   exam: DynamicExam,
-  updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>,
+  updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu" | "studyPlan" | "startDate">>,
 ) {
   await getUserId()
   const merged: DynamicExam = { ...exam, ...updates }
-  const studyPlan = calculateStudyPlan(merged, exam.studyPlan)
+  const examDatePostponed = updates.examDate !== undefined && updates.examDate > exam.examDate
+  if (examDatePostponed && merged.startDate < formatISODate(new Date())) {
+    merged.startDate = formatISODate(new Date())
+  }
+  const studyPlan = updates.studyPlan ?? calculateStudyPlan(merged, exam.studyPlan)
   const { error } = await supabase
     .from("dynamic_exams")
-    .update({ name: merged.name, exam_date: merged.examDate, type: merged.examType ?? null, cfu: merged.cfu ?? null, material: merged.material, study_plan: studyPlan })
+    .update({ name: merged.name, start_date: merged.startDate, exam_date: merged.examDate, type: merged.examType ?? null, cfu: merged.cfu ?? null, material: merged.material, study_plan: studyPlan })
     .eq("id", exam.id)
   if (error) throw error
+  await persistRebalancedActiveExams()
   return getAllExams()
+}
+
+// Scrive il solo study_plan senza ricalcoli né ribilanciamento: è il canale usato da
+// persistRebalancedActiveExams, quindi NON deve a sua volta triggerare il ribilanciamento.
+async function saveStudyPlan(examId: string, studyPlan: StudyPlan) {
+  await getUserId()
+  const { error } = await supabase.from("dynamic_exams").update({ study_plan: studyPlan }).eq("id", examId)
+  if (error) throw error
+}
+
+// Persiste il ribilanciamento del carico tra gli esami attivi.
+// Chiamata SOLO dopo mutazioni esplicite (aggiunta, modifica, completamento, ripristino),
+// mai durante il render: aprire la tab "Oggi" non deve scrivere su Supabase.
+// Best-effort: un fallimento qui non invalida la mutazione principale già riuscita.
+async function persistRebalancedActiveExams() {
+  try {
+    const { dynamicExams } = await getAllExams()
+    const activeExams = dynamicExams.filter((exam) => exam.status === "active")
+    const changed = computeRebalancedExams(activeExams)
+    await Promise.all(changed.map((exam) => saveStudyPlan(exam.id, exam.studyPlan)))
+  } catch (error) {
+    console.error("[persistRebalancedActiveExams] ribilanciamento non persistito:", error)
+  }
 }
 
 export async function saveExamDailyProgress(progress: Omit<ExamDailyProgress, "id" | "user_id" | "created_at">) {
@@ -148,7 +185,27 @@ export async function setDayCompletion(exam: DynamicExam, date: string, complete
   })
   const { error } = await supabase.from("dynamic_exams").update({ study_plan: studyPlan }).eq("id", exam.id)
   if (error) throw error
+  await persistRebalancedActiveExams()
   return getAllExams()
+}
+
+export async function markDayAheadAsCompleted(examId: string, date: string) {
+  const { dynamicExams } = await getAllExams()
+  const exam = dynamicExams.find((item) => item.id === examId)
+  if (!exam) throw new Error("Esame non trovato")
+
+  const nextDate = Object.keys(exam.studyPlan.dailySchedule).sort().find((item) => item > date)
+  if (!nextDate) return getAllExams()
+
+  const nextDay = exam.studyPlan.dailySchedule[nextDate]
+  const studyPlan = {
+    ...exam.studyPlan,
+    dailySchedule: {
+      ...exam.studyPlan.dailySchedule,
+      [nextDate]: { ...nextDay, completed: true, completedDate: date, hours: { min: 0, max: 0 } },
+    },
+  }
+  return updateExamMaterial(exam, { studyPlan })
 }
 
 export interface DailyProgressPoint {
