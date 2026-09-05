@@ -29,10 +29,12 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
   const entry = DAILY[todayKey]
   const todayLabel = entry?.label ?? todayKey
 
+  const topics = data.topics ?? {}
+
   // Global + per-subject progress
   const bySubject = (Object.keys(SUBJECTS) as SubjectKey[]).map((k) => {
     const all = TOPICS[k] ?? []
-    const done = all.filter((_, i) => data.topics[`${k}_${i}`] === "done").length
+    const done = all.filter((_, i) => topics[`${k}_${i}`] === "done").length
     const total = all.length
     const pct = total ? Math.round((done / total) * 100) : 0
     return { key: k, name: SUBJECTS[k].name, done, total, pct }
@@ -44,7 +46,7 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
   // Today's plan (planned + catchup)
   const items = getDayItems(todayKey, data)
   const todayPlan = items.map((it) => ({
-    sub: SUBJECTS[it.sub].name,
+    sub: SUBJECTS[it.sub]?.name ?? it.sub,
     dur: it.dur,
     topic: it.topic,
     done: it.done,
@@ -55,7 +57,7 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
   const skippedAll: SkippedItem[] = scanSkipped(data)
   const skipped = skippedAll.slice(0, 8).map((s) => ({
     day: DAILY[s.origDay]?.label ?? s.origDay,
-    sub: SUBJECTS[s.sub].name,
+    sub: SUBJECTS[s.sub]?.name ?? s.sub,
     topic: s.topic,
     dur: s.dur,
   }))
@@ -83,8 +85,9 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
     : null
 
   // Today's focus minutes
+  const sessions = Array.isArray(data.sessions) ? data.sessions : []
   const focusTodayMin = Math.round(
-    data.sessions
+    sessions
       .filter((s) => s.date === todayKey && s.mode === "focus")
       .reduce((sum, s) => sum + s.duration, 0),
   )
@@ -108,45 +111,63 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
  * Renders the AI snapshot as a compact markdown string for injection
  * into an LLM system prompt. Both the chat coach and the deep analyst
  * consume the SAME string → single source of truth → consistent fusion.
+ *
+ * Defensive: `s` may come from an untrusted client request body, so every
+ * field is normalized to a safe default before use to avoid throwing on
+ * undefined/missing data.
  */
-export function renderSnapshotAsMarkdown(s: AiSnapshot): string {
+export function renderSnapshotAsMarkdown(s: AiSnapshot | null | undefined): string {
+  const safe: AiSnapshot = {
+    today: s?.today ?? "",
+    todayLabel: s?.todayLabel ?? "",
+    progress: {
+      global: s?.progress?.global ?? { done: 0, total: 0, pct: 0 },
+      bySubject: Array.isArray(s?.progress?.bySubject) ? s.progress.bySubject : [],
+    },
+    todayPlan: Array.isArray(s?.todayPlan) ? s.todayPlan : [],
+    skipped: Array.isArray(s?.skipped) ? s.skipped : [],
+    nextExam: s?.nextExam ?? null,
+    nextBooking: s?.nextBooking ?? null,
+    focusTodayMin: s?.focusTodayMin ?? 0,
+  }
+
   const lines: string[] = []
-  lines.push(`# Stato studente al ${s.todayLabel}`)
+  lines.push(`# Stato studente al ${safe.todayLabel}`)
   lines.push(``)
   lines.push(
-    `**Progresso globale:** ${s.progress.global.done}/${s.progress.global.total} argomenti (${s.progress.global.pct}%)`,
+    `**Progresso globale:** ${safe.progress.global.done}/${safe.progress.global.total} argomenti (${safe.progress.global.pct}%)`,
   )
   lines.push(``)
   lines.push(`## Progresso per materia`)
-  for (const p of s.progress.bySubject) {
+  for (const p of safe.progress.bySubject) {
     lines.push(`- ${p.name}: ${p.done}/${p.total} (${p.pct}%)`)
   }
   lines.push(``)
-  if (s.nextExam) {
+  if (safe.nextExam) {
     lines.push(
-      `## Prossimo esame\n${s.nextExam.name} tra ${s.nextExam.daysUntil} giorni (${s.nextExam.date})`,
+      `## Prossimo esame\n${safe.nextExam.name} tra ${safe.nextExam.daysUntil} giorni (${safe.nextExam.date})`,
     )
   }
-  if (s.nextBooking) {
-    lines.push(`\n## Prossima scadenza\n${s.nextBooking.name} tra ${s.nextBooking.daysUntil} giorni`)
+  if (safe.nextBooking) {
+    lines.push(`\n## Prossima scadenza\n${safe.nextBooking.name} tra ${safe.nextBooking.daysUntil} giorni`)
   }
   lines.push(``)
   lines.push(`## Piano di oggi`)
-  if (s.todayPlan.length === 0) {
+  if (safe.todayPlan.length === 0) {
     lines.push(`_Nessuna sessione pianificata oggi._`)
   } else {
-    for (const t of s.todayPlan) {
+    for (const t of safe.todayPlan) {
       const tag = t.catchup ? " [RECUPERO]" : ""
       const done = t.done ? " ✓" : ""
       lines.push(`- (${t.sub}, ${t.dur})${tag}${done}: ${t.topic}`)
     }
   }
   lines.push(``)
-  lines.push(`## Sessioni di studio completate oggi: ${s.focusTodayMin} minuti`)
+  lines.push(`## Sessioni di studio completate oggi: ${safe.focusTodayMin} minuti`)
   lines.push(``)
-  if (s.skipped.length > 0) {
-    lines.push(`## Argomenti arretrati (${s.skipped.length})`)
-    for (const sk of s.skipped) {
+  if (safe.skipped.length > 0) {
+    lines.push(`## Argomenti arretrati (${safe.skipped.length})`)
+    for (const sk of safe.skipped) {
       lines.push(`- ${sk.day} — ${sk.sub} (${sk.dur}): ${sk.topic}`)
     }
   }

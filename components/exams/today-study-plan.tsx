@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ChevronDown, ChevronUp, Flame, ListChecks, X } from "lucide-react"
 import { useExams } from "./exams-context"
 import { formatISODate } from "@/lib/planner/utils/dates"
+import { balanceStudyLoad } from "@/lib/planner/algorithms/load-balancer"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SPRING_DEFAULT, SPRING_FILL, staggerSpring } from "@/lib/planner/motion"
@@ -80,6 +81,9 @@ export function TodayStudyPlan() {
     return { totalPages, totalHours }
   }, [todayTasks])
 
+  // Carico odierno per esame, solo informativo: spostare cosa è sempre una scelta dell'utente
+  const todayLoad = useMemo(() => balanceStudyLoad({ exams: activeExams })[today], [activeExams, today])
+
   const streak = useMemo(() => computeStreak(activeExams), [activeExams])
 
   if (loading) {
@@ -148,9 +152,9 @@ export function TodayStudyPlan() {
         </div>
       </div>
 
-      {totals.totalHours > 1.5 && (
+      {todayLoad?.isOverload && (
         <div role="alert" className="relative mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-          Il carico di oggi supera 1,5 ore consigliate.
+          Il carico di oggi supera 1,5 ore consigliate ({todayLoad.totalHours.toFixed(1)}h da {todayLoad.exams.length} {todayLoad.exams.length === 1 ? "esame" : "esami"}: {todayLoad.exams.map((e) => e.examName).join(", ")}). Valuta tu cosa spostare.
         </div>
       )}
 

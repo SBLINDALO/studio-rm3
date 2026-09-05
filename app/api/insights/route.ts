@@ -28,7 +28,7 @@ const InsightSchema = z.object({
 export type StudyInsights = z.infer<typeof InsightSchema>
 
 /**
- * DEEP analyst — structured insights (anthropic/claude-opus-4.6 via AI Gateway).
+ * DEEP analyst — structured insights (anthropic/claude-opus-4.7 via AI Gateway).
  * Produces a JSON object of actionable insights consumed by the "Analisi" tab.
  * Runs in parallel with the fast coach for data fusion.
  */
@@ -36,10 +36,11 @@ export async function POST(req: Request) {
   const { snapshot }: { snapshot: AiSnapshot } = await req.json()
   const contextMd = renderSnapshotAsMarkdown(snapshot)
 
-  const { experimental_output } = await generateText({
-    model: "anthropic/claude-opus-4.6",
-    temperature: 0.4,
-    system: `Sei un coach di studio senior per universitari italiani.
+  try {
+    const { experimental_output } = await generateText({
+      model: "anthropic/claude-opus-4.7",
+      temperature: 0.4,
+      system: `Sei un coach di studio senior per universitari italiani.
 Analizzi i dati grezzi dello studente e produci insight AZIONABILI in italiano.
 Regole:
 - Niente ovvietà, niente disclaimer.
@@ -47,11 +48,16 @@ Regole:
 - "action" deve iniziare con un verbo all'imperativo ("Ripassa", "Blocca 45 minuti", "Salta", ecc.).
 - Mix equilibrato: almeno 1 punto di forza, 1 rischio, 1 tip pratico.
 - "mood" basato su: % globale, argomenti arretrati, giorni all'esame.`,
-    prompt: `Analizza questo stato dello studente e genera gli insight:
+      prompt: `Analizza questo stato dello studente e genera gli insight:
 
 ${contextMd}`,
-    experimental_output: Output.object({ schema: InsightSchema }),
-  })
+      experimental_output: Output.object({ schema: InsightSchema }),
+    })
 
-  return Response.json(experimental_output)
+    return Response.json(experimental_output)
+  } catch (error) {
+    console.error(error instanceof Error ? error.stack : error)
+    const message = error instanceof Error ? error.message : "Errore sconosciuto"
+    return new Response(message, { status: 500 })
+  }
 }

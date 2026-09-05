@@ -29,6 +29,8 @@ export function AssistantChat({ snapshot, suggestedPrompts, seedPrompt, onSeedCo
   const snapshotRef = useRef(snapshot)
   useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
 
+  const [chatError, setChatError] = useState<string | null>(null)
+
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/coach",
@@ -36,6 +38,9 @@ export function AssistantChat({ snapshot, suggestedPrompts, seedPrompt, onSeedCo
         body: { messages, snapshot: snapshotRef.current },
       }),
     }),
+    onError: (error) => {
+      setChatError(error instanceof Error ? error.message : "Errore sconosciuto")
+    },
   })
 
   const speech = useSpeechRecognition("it-IT")
@@ -61,6 +66,7 @@ export function AssistantChat({ snapshot, suggestedPrompts, seedPrompt, onSeedCo
   const submit = () => {
     const text = input.trim()
     if (!text || status === "streaming" || status === "submitted") return
+    setChatError(null)
     sendMessage({ text })
     setInput("")
   }
@@ -120,6 +126,19 @@ export function AssistantChat({ snapshot, suggestedPrompts, seedPrompt, onSeedCo
             </motion.div>
           )
         })}
+
+        {/* Error message */}
+        {status === "error" && chatError && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div className="max-w-[85%] rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-[13px] leading-snug text-rose-800">
+              Si è verificato un errore: {chatError}
+            </div>
+          </motion.div>
+        )}
 
         {/* Typing indicator */}
         {status === "submitted" && (

@@ -5,7 +5,7 @@ import { renderSnapshotAsMarkdown } from "@/lib/planner/ai-context"
 export const maxDuration = 30
 
 /**
- * FAST coach — streaming chat (openai/gpt-5-mini via Vercel AI Gateway).
+ * FAST coach — streaming chat (openai/gpt-5.4-mini via Vercel AI Gateway).
  * Optimised for low latency tactical answers.
  */
 export async function POST(req: Request) {
@@ -24,12 +24,18 @@ Se ti mancano dati, chiedi una conferma rapida invece di inventare.
 ${contextMd}
 --- FINE CONTESTO ---`
 
-  const result = streamText({
-    model: "openai/gpt-5-mini",
-    system,
-    messages: await convertToModelMessages(messages),
-    temperature: 0.5,
-  })
+  try {
+    const result = streamText({
+      model: "openai/gpt-5.4-mini",
+      system,
+      messages: await convertToModelMessages(messages),
+      temperature: 0.5,
+    })
 
-  return result.toUIMessageStreamResponse()
+    return result.toUIMessageStreamResponse()
+  } catch (error) {
+    console.error(error instanceof Error ? error.stack : error)
+    const message = error instanceof Error ? error.message : "Errore sconosciuto"
+    return new Response(message, { status: 500 })
+  }
 }

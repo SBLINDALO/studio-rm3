@@ -102,6 +102,7 @@ export function TodayTab({
     setDeleteBusy(true)
     try {
       await removeExam(deletingExam.id)
+      await refreshDynamicExams().catch(() => {})
       onShowToast?.("Esame eliminato", "success")
       setDeletingExam(null)
     } catch (err) {
@@ -114,10 +115,16 @@ export function TodayTab({
   const handleArchiveExam = async (exam: CustomExam) => {
     try {
       await archiveExam(exam.id)
+      await refreshDynamicExams().catch(() => {})
       onShowToast?.("Esame segnato come dato", "success")
     } catch (err) {
       onShowToast?.(err instanceof Error ? err.message : "Impossibile aggiornare l'esame. Riprova.", "warn")
     }
+  }
+
+  const handleRestoreExam = async (id: string) => {
+    await restoreExam(id)
+    await refreshDynamicExams().catch(() => {})
   }
 
   return (
@@ -362,7 +369,7 @@ export function TodayTab({
 
         {archivedExams.length > 0 && (
           <div className="mt-4">
-            <ExamArchive archivedExams={archivedExams} onRestore={restoreExam} />
+            <ExamArchive archivedExams={archivedExams} onRestore={handleRestoreExam} />
           </div>
         )}
       </section>
@@ -502,6 +509,7 @@ export function TodayTab({
         onClose={() => setAddOpen(false)}
         onAdd={async (exam) => {
           await addCustomExam(exam)
+          await refreshDynamicExams().catch(() => {})
           onShowToast?.("Esame aggiunto con successo", "success")
         }}
       />
@@ -511,6 +519,7 @@ export function TodayTab({
         onClose={() => setEditingExam(null)}
         onSave={async (exam, updates) => {
           await updateExam(exam, updates)
+          await refreshDynamicExams().catch(() => {})
           onShowToast?.("Esame aggiornato", "success")
         }}
       />

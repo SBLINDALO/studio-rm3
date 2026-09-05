@@ -1,5 +1,6 @@
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 import type { DynamicExam, StudyPlan } from "@/lib/planner/types"
+import { DEFAULT_CONFIG, type DailySession, type Exam, type StudyPlanConfig } from "../types-exam"
 
 const DAY_MS = 86_400_000
 const REVIEW_DAYS_BEFORE = 4
@@ -110,4 +111,110 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
     ...(topicsPerDay ? { topicsPerDay } : {}),
     planStatus,
   }
+}
+
+/**
+ * Stima le ore totali necessarie per un esame.
+ * Combina n. argomenti e CFU: un esame da 12 CFU richiede più tempo
+ * di ragionamento/approfondimento per ogni argomento rispetto a uno da 6.
+ */
+function estimateTotalHours(exam: Exam): number {
+  if (exam.manualTotalHours) return exam.manualTotalHours
+  const hoursPerTopic = exam.cfu === 12 ? 2.2 : 1.4
+  return Math.max(exam.topics.length, 1) * hoursPerTopic
+}
+
+function addDaysToDate(dateStr: string, days: number): string {
+  const date = new Date(dateStr)
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+function isStudyDay(date: string, daysPerWeek: number): boolean {
+  const day = new Date(date).getDay()
+  if (daysPerWeek >= 6) return true
+  return day >= 1 && day <= daysPerWeek
+}
+
+/**
+ * Genera il piano di studio a partire dagli esami attivi.
+ */
+export function generateStudyPlan(
+  exams: Exam[],
+  today: string,
+  manualOverrides: DailySession[] = [],
+  carryForward: { examId: string; fromDate: string }[] = [],
+  config: StudyPlanConfig = DEFAULT_CONFIG,
+): DailySession[] {
+  const overrideKey = (date: string, examId: string) => `${date}__${examId}`
+  const overrideMap = new Map(manualOverrides.map((override) => [overrideKey(override.date, override.examId), override]))
+  const carriedSet = new Set(carryForward.map((carried) => `${addDaysToDate(carried.fromDate, 1)}__${carried.examId}`))
+  const sessions: DailySession[] = []
+
+  for (const exam of exams) {
+    const totalHours = estimateTotalHours(exam)
+    const lastStudyDate = addDaysToDate(exam.date, -config.bufferDaysBeforeExam)
+    const availableDays: string[] = []
+    let cursor = today
+
+    while (cursor < lastStudyDate) {
+      if (isStudyDay(cursor, config.daysPerWeek)) availableDays.push(cursor)
+      cursor = addDaysToDate(cursor, 1)
+    }
+    if (availableDays.length === 0) continue
+
+    const hoursPerDay = Math.min(totalHours / availableDays.length, config.perSubjectMaxHoursPerDay)
+
+    for (const date of availableDays) {
+      const key = overrideKey(date, exam.id)
+      if (carriedSet.has(key)) {
+        sessions.push({
+          date,
+          examId: exam.id,
+          hours: 0,
+          auto: false,
+          completed: true,
+          carriedForwardFrom: addDaysToDate(date, -1),
+        })
+        continue
+      }
+      const override = overrideMap.get(key)
+      if (override) {
+        sessions.push({ ...override, auto: false })
+        continue
+      }
+      sessions.push({ date, examId: exam.id, hours: Number(hoursPerDay.toFixed(2)), auto: true, completed: false })
+    }
+  }
+
+  return enforceDailyCap(sessions, config.dailyMaxHours)
+}
+
+/**
+ * Riduce proporzionalmente solo le sessioni generate automaticamente quando
+ * il totale giornaliero supera il limite configurato.
+ */
+function enforceDailyCap(sessions: DailySession[], dailyMaxHours: number): DailySession[] {
+  const byDate = new Map<string, DailySession[]>()
+  for (const session of sessions) {
+    const daySessions = byDate.get(session.date) ?? []
+    daySessions.push(session)
+    byDate.set(session.date, daySessions)
+  }
+
+  const result: DailySession[] = []
+  for (const daySessions of byDate.values()) {
+    const manual = daySessions.filter((session) => !session.auto)
+    const auto = daySessions.filter((session) => session.auto)
+    const manualTotal = manual.reduce((sum, session) => sum + session.hours, 0)
+    const remainingBudget = Math.max(dailyMaxHours - manualTotal, 0)
+    const autoTotal = auto.reduce((sum, session) => sum + session.hours, 0)
+
+    if (autoTotal > remainingBudget && autoTotal > 0) {
+      const scale = remainingBudget / autoTotal
+      for (const session of auto) session.hours = Number((session.hours * scale).toFixed(2))
+    }
+    result.push(...manual, ...auto)
+  }
+  return result
 }

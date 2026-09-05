@@ -120,6 +120,11 @@ CREATE POLICY "Users can view own dynamic exams" ON dynamic_exams FOR SELECT USI
 CREATE POLICY "Users can insert own dynamic exams" ON dynamic_exams FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own dynamic exams" ON dynamic_exams FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own dynamic exams" ON dynamic_exams FOR DELETE USING (auth.uid() = user_id);
+ALTER TABLE dynamic_exams REPLICA IDENTITY FULL;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE dynamic_exams;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS exam_daily_progress (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

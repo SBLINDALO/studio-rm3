@@ -2,7 +2,7 @@ import type { BalancedSchedule, DayLoad, DynamicExam } from "@/lib/planner/types
 
 const MAX_HOURS_PER_DAY = 1.5
 
-export function balanceStudyLoad(exams: DynamicExam[]): BalancedSchedule {
+export function balanceStudyLoad({ exams }: { exams: DynamicExam[] }): BalancedSchedule {
   const allDates = new Set<string>()
   exams.forEach((exam) => {
     Object.keys(exam.studyPlan.dailySchedule).forEach((date) => allDates.add(date))
