@@ -19,24 +19,26 @@ import {
   Circle,
   Zap,
 } from "lucide-react"
-import { SUBJECTS, C, DAILY_GOAL_MIN } from "@/lib/planner/data"
-import { SubjectIcon } from "./subject-icon"
+import { DAILY_GOAL_MIN } from "@/lib/planner/data"
+import { useExams } from "@/components/exams/exams-context"
 import { fmtTime, fmtDuration } from "@/lib/planner/helpers"
-import type { SubjectKey, TimerMode, LoggedSession } from "@/lib/planner/types"
+import type { TimerMode, LoggedSession } from "@/lib/planner/types"
+
+const EXAM_COLORS = ["#F43F5E", "#6366F1", "#F59E0B", "#10B981"]
 
 interface Props {
   timerRemaining: number
   timerTotal: number
   timerActive: boolean
   timerMode: TimerMode
-  timerSubject: SubjectKey | null
+  timerSubject: string | null
   customMin: number
   autoChain: boolean
   soundOn: boolean
   todayFocusMin: number
   todayFocusCount: number
   todaySessions: LoggedSession[]
-  onSubjectChange: (s: SubjectKey | null) => void
+  onSubjectChange: (s: string | null) => void
   onStart: () => void
   onPause: () => void
   onReset: () => void
@@ -78,10 +80,12 @@ export function TimerTab({
   onToggleSound,
   onOpenFocus,
 }: Props) {
+  const { activeExams } = useExams()
+  const selectedExamIndex = activeExams.findIndex((exam) => exam.id === timerSubject)
   const progress = timerTotal > 0 ? 1 - timerRemaining / timerTotal : 0
   const circumference = 2 * Math.PI * 110
   const accent = timerSubject
-    ? C[timerSubject].dot
+    ? EXAM_COLORS[Math.max(selectedExamIndex, 0) % EXAM_COLORS.length]
     : timerMode === "focus"
       ? "#E11D48" // rose-600, urgent-style accent for active focus
       : "#059669" // emerald for breaks
@@ -106,21 +110,22 @@ export function TimerTab({
           >
             <Circle size={11} strokeWidth={2} /> Generale
           </motion.button>
-          {(Object.entries(SUBJECTS) as [SubjectKey, (typeof SUBJECTS)[SubjectKey]][]).map(([k, s]) => {
-            const sel = timerSubject === k
+          {activeExams.map((exam, index) => {
+            const sel = timerSubject === exam.id
+            const color = EXAM_COLORS[index % EXAM_COLORS.length]
             return (
               <motion.button
-                key={k}
+                key={exam.id}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => onSubjectChange(k)}
+                onClick={() => onSubjectChange(exam.id)}
                 className="flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-medium transition-colors"
                 style={{
-                  background: sel ? C[k].dot : "white",
-                  color: sel ? "white" : C[k].text,
-                  borderColor: sel ? C[k].dot : "var(--border)",
+                  background: sel ? color : "white",
+                  color: sel ? "white" : color,
+                  borderColor: sel ? color : "var(--border)",
                 }}
               >
-                <SubjectIcon sub={k} size={11} strokeWidth={2} /> {s.short}
+                <Circle size={11} strokeWidth={2} fill={sel ? "white" : color} /> {exam.name}
               </motion.button>
             )
           })}
@@ -366,7 +371,9 @@ export function TimerTab({
               .reverse()
               .slice(0, 5)
               .map((s) => {
-                const col = s.subject ? C[s.subject] : C.gen
+                const examIndex = activeExams.findIndex((exam) => exam.id === s.subject)
+                const color = examIndex >= 0 ? EXAM_COLORS[examIndex % EXAM_COLORS.length] : "#64748B"
+                const examName = examIndex >= 0 ? activeExams[examIndex].name : "Esame rimosso"
                 return (
                   <div
                     key={s.id}
@@ -374,7 +381,7 @@ export function TimerTab({
                   >
                     <div
                       className="absolute left-0 top-0 h-full w-[3px]"
-                      style={{ background: col.dot }}
+                      style={{ background: color }}
                       aria-hidden
                     />
                     <span className="text-[10px] font-medium tabular-nums text-stone-400">
@@ -382,14 +389,14 @@ export function TimerTab({
                     </span>
                     <span
                       className="flex items-center gap-1 text-[11.5px] font-medium"
-                      style={{ color: col.text }}
+                      style={{ color }}
                     >
                       {s.subject ? (
-                        <SubjectIcon sub={s.subject} size={11} strokeWidth={2} />
+                        <Circle size={10} strokeWidth={2} fill={color} />
                       ) : (
                         <Circle size={10} strokeWidth={2} />
                       )}
-                      {s.subject ? SUBJECTS[s.subject].short : "Generale"}
+                      {s.subject ? examName : "Generale"}
                     </span>
                     <span className="ml-auto flex items-center gap-1 text-[11px] font-medium text-stone-600">
                       {s.mode === "focus" ? (

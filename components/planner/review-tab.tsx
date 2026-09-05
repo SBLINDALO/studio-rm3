@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Check, AlertTriangle, X, FileText, Gauge } from "lucide-react"
-import { WEEKS, PHASE_COLOR } from "@/lib/planner/data"
 import { StatsView } from "./stats-view"
 import type { PlannerData } from "@/lib/planner/types"
 import { useExams } from "@/components/exams/exams-context"
@@ -38,9 +37,10 @@ const EXAM_COLORS = [
 
 export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
   const { activeExams, loading: examsLoading } = useExams()
-  const [selectedWeek, setSelectedWeek] = useState(0)
-  const wk = WEEKS[selectedWeek]
-  const phaseColor = PHASE_COLOR[wk.phase]
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(null)
+  const selectedExam = activeExams.find((exam) => exam.id === selectedExamId) ?? activeExams[0]
+  const selectedExamIndex = selectedExam ? activeExams.indexOf(selectedExam) : 0
+  const selectedColor = EXAM_COLORS[selectedExamIndex % EXAM_COLORS.length]
 
   return (
     <div className="space-y-4">
@@ -48,31 +48,33 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
         Da compilare ogni domenica. I dati vengono salvati automaticamente.
       </p>
 
-      <StatsView sessions={data.sessions} topics={data.topics} />
+      <StatsView sessions={data.sessions} />
 
-      {/* Week selector */}
+      {/* Exam selector */}
       <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1">
-        {WEEKS.map((w, wi) => {
-          const active = selectedWeek === wi
+        {activeExams.map((exam, index) => {
+          const active = (selectedExam?.id ?? null) === exam.id
+          const color = EXAM_COLORS[index % EXAM_COLORS.length]
           return (
             <motion.button
-              key={wi}
+              key={exam.id}
               whileTap={{ scale: 0.96 }}
-              onClick={() => setSelectedWeek(wi)}
+              onClick={() => setSelectedExamId(exam.id)}
               className={`flex-shrink-0 rounded-full border px-3.5 py-1.5 text-[11.5px] font-medium transition-all ${
                 active
                   ? "border-stone-900 bg-stone-900 text-white shadow-sm"
                   : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50"
               }`}
             >
-              S{wi + 1}
+              <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: active ? "white" : color.dot }} />
+              {exam.name}
             </motion.button>
           )
         })}
       </div>
 
       <motion.article
-        key={selectedWeek}
+        key={selectedExam?.id ?? "no-exam"}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={SPRING_SHEET}
@@ -80,21 +82,21 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
       >
         <div
           className="border-b border-[var(--border-subtle)] px-4 py-3"
-          style={{ background: `color-mix(in oklch, ${phaseColor} 10%, white)` }}
+          style={{ background: `color-mix(in oklch, ${selectedColor.dot} 10%, white)` }}
         >
           <div
             className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.14em]"
-            style={{ color: phaseColor }}
+            style={{ color: selectedColor.dot }}
           >
             <span
               className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: phaseColor }}
+              style={{ background: selectedColor.dot }}
               aria-hidden
             />
-            {wk.phaseLabel}
+            Verifica esame
           </div>
           <div className="mt-0.5 text-[14.5px] font-semibold text-stone-900">
-            {wk.label} · {wk.dates}
+            {selectedExam ? `${selectedExam.name} · ${selectedExam.examDate}` : "Nessun esame attivo"}
           </div>
         </div>
 
@@ -105,7 +107,8 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
               <div className="mb-2 text-[12.5px] font-medium text-stone-900">{q}</div>
               <div className="flex gap-1.5">
                 {OPTIONS.map((opt, oi) => {
-                  const k = `${selectedWeek}_q${qi}`
+                  // TODO: salvare le risposte della verifica in un modello Supabase dedicato per esame.
+                  const k = `review_${selectedExam?.id ?? "none"}_q${qi}`
                   const sel = data.check[k] === oi
                   const Icon = opt.Icon
                   return (
@@ -143,7 +146,7 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
                 <p className="text-[12px] text-stone-400">Nessun esame attivo da verificare.</p>
               </div>
             ) : activeExams.map((exam, index) => {
-              const confKey = `${selectedWeek}_${exam.id}`
+              const confKey = `confidence_${exam.id}`
               const val = data.conf[confKey] || 0
               const color = EXAM_COLORS[index % EXAM_COLORS.length]
               return (
@@ -186,8 +189,9 @@ export function ReviewTab({ data, setCheck, setConf, setNote }: Props) {
               <FileText size={13} strokeWidth={2} /> Argomenti da recuperare
             </label>
             <textarea
-              value={data.notes[selectedWeek] || ""}
-              onChange={(e) => setNote(selectedWeek, e.target.value)}
+              // TODO: migrare le note di verifica dal PlannerData legacy a un record per dynamic_exam.
+              value={data.notes[selectedExamIndex] || ""}
+              onChange={(e) => setNote(selectedExamIndex, e.target.value)}
               placeholder="Es: rivedere Fodor, Richardson Cap. 3..."
               className="min-h-[90px] w-full resize-y rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2.5 text-[13px] text-stone-800 placeholder:text-stone-400 transition-colors focus:border-stone-400 focus:bg-white focus:outline-none"
             />

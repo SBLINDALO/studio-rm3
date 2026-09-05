@@ -11,7 +11,7 @@ import { SPRING_SHEET } from "@/lib/planner/motion"
 interface Props {
   open: boolean
   onClose: () => void
-  onAdd: (exam: Omit<DynamicExam, "id" | "createdAt" | "status">) => void | Promise<void>
+  onAdd: (exam: Omit<DynamicExam, "id" | "createdAt">) => void | Promise<void>
 }
 
 const materialTypes: Array<{ value: DynamicExam["material"]["type"]; label: string }> = [
@@ -44,20 +44,22 @@ export function AddExamModal({ open, onClose, onAdd }: Props) {
   const reset = () => { setName(""); setDate(""); setType("pages"); setExamType("Scritto"); setCfu(6); setPages(""); setNotes(""); setError("") }
   const close = () => { reset(); onClose() }
   const add = async () => {
-    if (!name.trim() || !date) { setError("Inserisci nome e data dell'esame"); return }
+    if (!name.trim()) { setError("Inserisci il nome dell'esame"); return }
     const startDate = formatISODate(new Date())
     const material: DynamicExam["material"] = {
       type,
       totalPages: pages ? Number(pages) : undefined,
       notes: notes.trim() || undefined,
     }
-    if (!material.totalPages && !material.notes && !(material.files?.length)) {
+    // Senza data l'esame resta "planning": nessun piano da calcolare, il materiale può essere aggiunto anche dopo
+    if (date && !material.totalPages && !material.notes && !(material.files?.length)) {
       setError("Aggiungi almeno una fonte di materiale")
       return
     }
-    const exam = { name: name.trim(), startDate, examDate: date, examType, cfu, material }
+    const status: DynamicExam["status"] = date ? "active" : "planning"
+    const exam = { name: name.trim(), startDate, examDate: date || null, examType, cfu, material, status }
     try {
-      await onAdd({ ...exam, studyPlan: calculateStudyPlan({ ...exam, id: "new", createdAt: Date.now(), status: "active", studyPlan: { totalDaysAvailable: 0, studyDaysPerWeek: 5, hoursPerDay: { min: 1, max: 1.5 }, reviewDaysBefore: 4, dailySchedule: {} } }) })
+      await onAdd({ ...exam, studyPlan: calculateStudyPlan({ ...exam, id: "new", createdAt: Date.now(), studyPlan: { totalDaysAvailable: 0, studyDaysPerWeek: 5, hoursPerDay: { min: 1, max: 1.5 }, reviewDaysBefore: 4, dailySchedule: {} } }) })
       close()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Impossibile aggiungere l'esame. Riprova.")
@@ -81,7 +83,7 @@ export function AddExamModal({ open, onClose, onAdd }: Props) {
       <div className="flex items-center justify-between pb-3"><h2 className="text-[18px] font-semibold text-stone-900">Nuovo esame</h2><button onClick={close} aria-label="Chiudi"><X size={18} /></button></div>
       <div className="space-y-3">
         <label className="block text-xs font-medium text-stone-600">Nome<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Es. Storia dell'arte" /></label>
-        <label className="block text-xs font-medium text-stone-600">Data esame<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" /></label>
+        <label className="block text-xs font-medium text-stone-600">Data esame (facoltativa)<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" /><span className="mt-1 block text-[11px] leading-snug text-stone-500">Senza data l'esame resta "in programmazione": potrai aggiungerla in seguito.</span></label>
         <div><p className="mb-1 text-xs font-medium text-stone-600">Tipo esame</p><div className="grid grid-cols-2 gap-2">{examTypes.map((item) => <button type="button" key={item.value} onClick={() => setExamType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${examType === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         <div><p className="mb-1 text-xs font-medium text-stone-600">CFU</p><div className="grid grid-cols-2 gap-2">{cfuOptions.map((item) => <button type="button" key={item.value} onClick={() => setCfu(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${cfu === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         <div><p className="mb-1 text-xs font-medium text-stone-600">Materiale</p><div className="grid grid-cols-4 gap-2">{materialTypes.map((item) => <button type="button" key={item.value} onClick={() => setType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${type === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>

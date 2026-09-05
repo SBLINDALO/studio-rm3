@@ -1,45 +1,6 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { DAILY } from "@/lib/planner/data"
-import { TOPICS } from "@/lib/planner/data"
-import { getTodayStr } from "@/lib/planner/helpers"
-
-function formatDateKey(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
-function getTodayKey() {
-  const now = new Date()
-  const todayKey = formatDateKey(now)
-  return todayKey in DAILY ? todayKey : getTodayStr()
-}
-
-function getTodayChapters() {
-  const today = DAILY[getTodayKey()]
-  if (!today?.sessions?.length) {
-    return "Nessun capitolo in programma oggi."
-  }
-  return today.sessions.map((session) => session.topic).join(", ")
-}
-
-function getCurrentProgressPct() {
-  try {
-    const raw = localStorage.getItem("planner5v3")
-    if (!raw) return 0
-    const parsed = JSON.parse(raw)
-    const topics = parsed?.topics ?? {}
-    const total = Object.values(TOPICS).reduce((sum, list) => sum + list.length, 0)
-    const done = Object.values(topics).filter((value) => value === "done").length
-    return total === 0 ? 0 : Math.round((done / total) * 100)
-  } catch {
-    return 0
-  }
-}
-
 function getNextFireTime(hour: number, minute: number) {
   const now = new Date()
   const target = new Date(now)
@@ -55,8 +16,6 @@ function msUntil(date: Date) {
 }
 
 function buildNotificationPayload() {
-  const todayChapters = getTodayChapters()
-  const progressPct = getCurrentProgressPct()
   const morningTarget = getNextFireTime(8, 0)
   const afternoonTarget = getNextFireTime(15, 30)
 
@@ -66,14 +25,16 @@ function buildNotificationPayload() {
         id: "morning-study-reminder",
         time: morningTarget.getTime(),
         title: "Buongiorno!",
-        body: `Oggi in programma: ${todayChapters}`,
+        // TODO: collegare il riepilogo al piano dinamico dynamic_exams.
+        body: "Apri il piano di studio per vedere gli obiettivi di oggi.",
         tag: "study-morning",
       },
       {
         id: "afternoon-progress-reminder",
         time: afternoonTarget.getTime(),
         title: "Continua così!",
-        body: `Sei al ${progressPct}% del tuo obiettivo.`,
+        // TODO: collegare la percentuale al progresso degli esami dinamici.
+        body: "Continua il tuo piano di studio.",
         tag: "study-afternoon",
       },
     ],

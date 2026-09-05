@@ -7,19 +7,16 @@ import { WEEKS, DAILY, C, SUBJECTS, PHASE_COLOR } from "@/lib/planner/data"
 import { getTodayStr } from "@/lib/planner/helpers"
 import { SubjectIcon } from "./subject-icon"
 import { StudyDocViewer } from "./study-doc-viewer"
-import { getCatchupCountForDay, getDayItems } from "@/lib/planner/catchup"
 import type { PlannerData, SubjectKey, StudyDoc } from "@/lib/planner/types"
 
 interface Props {
   data: PlannerData
   toggleDaily: (day: string, ti: number) => void
-  toggleCatchupDone: (id: string) => void
   attachDoc: (key: string, doc: StudyDoc) => void
   removeDoc: (key: string) => void
-  skippedByDay: Record<string, number>
 }
 
-export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, removeDoc, skippedByDay }: Props) {
+export function ScheduleTab({ data, toggleDaily, attachDoc, removeDoc }: Props) {
   const [openWeek, setOpenWeek] = useState<number>(0)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const todayKey = getTodayStr()
@@ -111,11 +108,8 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, r
 
                       const isExamDay = d.exam
                       const isSel = selectedDay === dayStr
-                      const dayItems = getDayItems(dayStr, data)
+                      const dayItems = (d.sessions ?? []).map((session, plannedIdx) => ({ ...session, plannedIdx, done: !!data.daily[`${dayStr}_${plannedIdx}`] }))
                       const doneTasks = dayItems.filter((it) => it.done).length
-                      const catchupOnDay = getCatchupCountForDay(dayStr, data)
-                      const skippedOnDay = skippedByDay[dayStr] ?? 0
-                      const isPast = dayStr < todayKey
                       const isToday = dayStr === todayKey
                       const colSub = isExamDay && d.sub ? C[d.sub as SubjectKey] : null
 
@@ -217,16 +211,6 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, r
                                       {doneTasks}/{dayItems.length}
                                     </span>
                                   )}
-                                  {catchupOnDay > 0 && (
-                                    <span className="flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9.5px] font-medium text-amber-800">
-                                      <RotateCw size={8} strokeWidth={2.5} />+{catchupOnDay}
-                                    </span>
-                                  )}
-                                  {isPast && skippedOnDay > 0 && (
-                                    <span className="flex items-center gap-0.5 rounded-md bg-rose-100 px-1.5 py-0.5 text-[9.5px] font-medium text-rose-800">
-                                      <X size={8} strokeWidth={2.5} />{skippedOnDay} saltato{skippedOnDay > 1 ? "i" : ""}
-                                    </span>
-                                  )}
                                 </div>
                               )}
                             </div>
@@ -260,27 +244,21 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, r
 
                                   {dayItems.map((s) => {
                                     const done = s.done
-                                    const isCatchup = s.kind === "catchup"
-                                    const docKey = isCatchup ? s.catchupId! : `${dayStr}_${s.plannedIdx!}`
+                                    const docKey = `${dayStr}_${s.plannedIdx}`
                                     return (
                                       <motion.div
-                                        key={isCatchup ? `c_${s.catchupId}` : `p_${s.plannedIdx}`}
+                                        key={`p_${s.plannedIdx}`}
                                         className="relative overflow-hidden rounded-lg border border-[var(--border-subtle)] p-2.5 text-left transition-colors"
                                         style={{
                                           background: done
                                             ? "#F0FDF4"
-                                            : isCatchup
-                                              ? "#FFFBEB"
-                                              : "white",
+                                            : "white",
                                           borderLeftWidth: 3,
                                           borderLeftColor: C[s.sub].dot,
                                         }}
                                       >
                                         <button
-                                          onClick={() => {
-                                            if (isCatchup && s.catchupId) toggleCatchupDone(s.catchupId)
-                                            else if (s.plannedIdx !== undefined) toggleDaily(dayStr, s.plannedIdx)
-                                          }}
+                                          onClick={() => toggleDaily(dayStr, s.plannedIdx)}
                                           className="flex w-full items-start gap-2 text-left"
                                         >
                                           <span
@@ -303,12 +281,6 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, r
                                               <SubjectIcon sub={s.sub} size={10} strokeWidth={2} />
                                               <span>{SUBJECTS[s.sub].short}</span>
                                               <span className="text-stone-400">· {s.dur}</span>
-                                              {isCatchup && (
-                                                <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[8.5px] font-medium uppercase tracking-wider text-amber-800">
-                                                  <RotateCw size={7} strokeWidth={2.5} />
-                                                  Recupero
-                                                </span>
-                                              )}
                                             </span>
                                             <span
                                               className={`mt-0.5 block text-[11.5px] leading-snug ${
@@ -318,11 +290,6 @@ export function ScheduleTab({ data, toggleDaily, toggleCatchupDone, attachDoc, r
                                               }`}
                                             >
                                               {s.topic}
-                                              {isCatchup && s.origDay && (
-                                                <span className="ml-1.5 text-[10px] text-amber-700">
-                                                  ↺ da {DAILY[s.origDay]?.label ?? s.origDay}
-                                                </span>
-                                              )}
                                             </span>
                                           </span>
                                         </button>

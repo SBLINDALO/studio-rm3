@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Check, ChevronDown, GraduationCap } from "lucide-react"
+import { Check, ChevronDown, GraduationCap, NotebookPen } from "lucide-react"
 import { useExams } from "@/components/exams/exams-context"
 import { computeExamProgress } from "@/components/exams/exam-utils"
 import { calculateMaterialQuantity } from "@/lib/planner/algorithms/study-plan-calculator"
+import { EditExamModal } from "./edit-exam-modal"
+import type { CustomExam, DynamicExam } from "@/lib/planner/types"
 
 const EXAM_COLORS = [
   { dot: "#F43F5E", text: "#BE123C", soft: "#FFF1F2" },
@@ -14,18 +16,36 @@ const EXAM_COLORS = [
   { dot: "#10B981", text: "#065F46", soft: "#ECFDF5" },
 ]
 
+// Adatta un esame "planning" (senza data) a CustomExam per riusare EditExamModal
+function toPlanningCustomExam(exam: DynamicExam): CustomExam {
+  return {
+    ...exam,
+    short: exam.name.slice(0, 12),
+    examDate: "Da pianificare",
+    examISO: exam.examDate ?? "",
+    examTime: "-",
+    examType: exam.examType ?? "Scritto",
+    color: { bg: "#F5F5F4", border: "#D6D3D1", text: "#57534E", dot: "#78716C", soft: "#FAFAF9" },
+    chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [],
+  }
+}
+
 export function TrackerTab() {
-  const { activeExams, loading, setDayCompletion } = useExams()
+  const { activeExams, planningExams, loading, setDayCompletion, updateExamMaterial } = useExams()
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [editingPlanningExam, setEditingPlanningExam] = useState<CustomExam | null>(null)
   const exams = useMemo(
     () => activeExams.map((exam, index) => ({ exam, color: EXAM_COLORS[index % EXAM_COLORS.length] })),
     [activeExams],
   )
 
   if (loading) return <div className="py-8 text-center text-sm text-stone-500">Caricamento esami...</div>
-  if (!exams.length) return <div className="py-8 text-center text-sm text-stone-500">Aggiungi un esame per monitorare i suoi argomenti.</div>
 
-  return <div className="space-y-3">
+  return <div className="space-y-5">
+  {!exams.length && !planningExams.length ? (
+    <div className="py-8 text-center text-sm text-stone-500">Aggiungi un esame per monitorare i suoi argomenti.</div>
+  ) : <>
+  <div className="space-y-3">
     {exams.map(({ exam, color }, examIndex) => {
       const { topics } = calculateMaterialQuantity(exam.material)
       const progress = computeExamProgress(exam)
@@ -70,5 +90,41 @@ export function TrackerTab() {
         </motion.div>}</AnimatePresence>
       </motion.article>
     })}
+  </div>
+
+  {planningExams.length > 0 && (
+    <div>
+      <h3 className="mb-2 px-0.5 text-[12px] font-semibold uppercase tracking-wide text-stone-500">In programmazione</h3>
+      <div className="space-y-2">
+        {planningExams.map((exam) => (
+          <div key={exam.id} className="card-quiet flex items-center justify-between gap-3 p-3.5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-500"><NotebookPen size={14} strokeWidth={2} /></span>
+              <div className="min-w-0">
+                <div className="truncate text-[13.5px] font-medium text-stone-800">{exam.name}</div>
+                <div className="text-[11px] text-stone-500">{exam.cfu ? `${exam.cfu} CFU · ` : ""}Nessuna data ancora</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingPlanningExam(toPlanningCustomExam(exam))}
+              className="shrink-0 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-[12px] font-medium text-stone-700 hover:bg-stone-50"
+            >
+              Materiale
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+  </>}
+
+  <EditExamModal
+    exam={editingPlanningExam}
+    onClose={() => setEditingPlanningExam(null)}
+    onSave={async (exam, updates) => {
+      await updateExamMaterial(exam, updates)
+    }}
+  />
   </div>
 }

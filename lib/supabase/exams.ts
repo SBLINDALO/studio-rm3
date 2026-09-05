@@ -31,13 +31,15 @@ function toCustomExam(exam: DynamicExam, index: number): CustomExam {
     { bg: "#FFFBEB", border: "#FCD34D", text: "#92400E", dot: "#F59E0B", soft: "#FFFCF4" },
     { bg: "#ECFDF5", border: "#6EE7B7", text: "#065F46", dot: "#10B981", soft: "#F7FCF9" },
   ]
-  const formattedDate = parseISODate(exam.examDate).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })
-  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examDate: formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1), examTime: "—", examType: exam.examType ?? "Scritto", cfu: exam.cfu, examISO: exam.examDate, color: colors[index % colors.length], material: exam.material, chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [], createdAt: exam.createdAt, startDate: exam.startDate, studyPlan: exam.studyPlan, status: exam.status }
+  // invariant: solo gli esami "active" arrivano qui e hanno sempre examDate valorizzato
+  const formattedDate = parseISODate(exam.examDate as string).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })
+  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examDate: formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1), examTime: "—", examType: exam.examType ?? "Scritto", cfu: exam.cfu, examISO: exam.examDate as string, color: colors[index % colors.length], material: exam.material, chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [], createdAt: exam.createdAt, startDate: exam.startDate, studyPlan: exam.studyPlan, status: exam.status }
 }
 
 function toArchivedExam(exam: DynamicExam): ArchivedExam {
   const completed = Object.values(exam.studyPlan.dailySchedule).filter((day) => day.completed).length
-  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examISO: exam.examDate, examType: exam.examType ?? "Scritto", color: { dot: "#64748B", text: "#475569", bg: "#F8FAFC" }, completedAt: exam.createdAt, topicsTotal: Object.keys(exam.studyPlan.dailySchedule).length, topicsDone: completed, completionPct: 0 }
+  // invariant: solo "archived"/"completed" arrivano qui, mai "planning" (examDate null)
+  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examISO: exam.examDate as string, examType: exam.examType ?? "Scritto", color: { dot: "#64748B", text: "#475569", bg: "#F8FAFC" }, completedAt: exam.createdAt, topicsTotal: Object.keys(exam.studyPlan.dailySchedule).length, topicsDone: completed, completionPct: 0 }
 }
 
 export async function getAllExams(): Promise<{ customExams: CustomExam[]; archivedExams: ArchivedExam[]; dynamicExams: DynamicExam[] }> {
@@ -45,7 +47,8 @@ export async function getAllExams(): Promise<{ customExams: CustomExam[]; archiv
   const { data, error } = await supabase.from("dynamic_exams").select("*").order("exam_date", { ascending: true })
   if (error) throw error
   const dynamicExams: DynamicExam[] = (data ?? []).map((row) => ({ id: row.id, name: row.name, startDate: row.start_date, examDate: row.exam_date, examType: row.type ?? null, cfu: row.cfu ?? null, material: row.material, studyPlan: row.study_plan, createdAt: new Date(row.created_at).getTime(), status: row.status }))
-  return { dynamicExams, customExams: dynamicExams.filter((exam) => exam.status === "active").map(toCustomExam), archivedExams: dynamicExams.filter((exam) => exam.status !== "active").map(toArchivedExam) }
+  // Esclude esplicitamente "planning" (mai un esame archiviato/completato): examDate null vi crasherebbe toArchivedExam
+  return { dynamicExams, customExams: dynamicExams.filter((exam) => exam.status === "active").map(toCustomExam), archivedExams: dynamicExams.filter((exam) => exam.status === "archived" || exam.status === "completed").map(toArchivedExam) }
 }
 
 // Piano iniziale valido: study_plan è NOT NULL, quindi non passiamo mai null/undefined
@@ -53,11 +56,11 @@ export async function getAllExams(): Promise<{ customExams: CustomExam[]; archiv
 // La forma rispecchia StudyPlan (dailySchedule vuoto = nessun giorno pianificato).
 const EMPTY_STUDY_PLAN: StudyPlan = { totalDaysAvailable: 0, studyDaysPerWeek: 5, hoursPerDay: { min: 1, max: 1.5 }, reviewDaysBefore: 4, dailySchedule: {} }
 
-export async function addCustomExam(exam: Omit<DynamicExam, "id" | "createdAt" | "status">) {
+export async function addCustomExam(exam: Omit<DynamicExam, "id" | "createdAt">) {
   const userId = await getUserId()
   // created_at è bigint NOT NULL senza default: va inviato esplicitamente come epoch ms
   // (coerente con la lettura new Date(row.created_at).getTime() in getAllExams)
-  const { error } = await supabase.from("dynamic_exams").insert({ user_id: userId, name: exam.name, start_date: exam.startDate, exam_date: exam.examDate, type: exam.examType ?? null, cfu: exam.cfu ?? null, material: exam.material, study_plan: exam.studyPlan ?? EMPTY_STUDY_PLAN, status: "active", created_at: Date.now() })
+  const { error } = await supabase.from("dynamic_exams").insert({ user_id: userId, name: exam.name, start_date: exam.startDate, exam_date: exam.examDate, type: exam.examType ?? null, cfu: exam.cfu ?? null, material: exam.material, study_plan: exam.studyPlan ?? EMPTY_STUDY_PLAN, status: exam.status, created_at: Date.now() })
   if (error) {
     // Log diagnostico prima del messaggio generico mostrato all'utente: rivela la causa esatta
     // (es. 23502 NOT NULL violation, 42501 RLS, 22P02 tipo bigint) se l'insert fallisce ancora.
@@ -99,18 +102,18 @@ export async function restoreExam(id: string) {
 // Chi preferisce preservare la cronologia passata deve fissare startDate a oggi dal modale.
 export async function updateExamMaterial(
   exam: DynamicExam,
-  updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu" | "studyPlan" | "startDate">>,
+  updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu" | "studyPlan" | "startDate" | "status">>,
 ) {
   await getUserId()
   const merged: DynamicExam = { ...exam, ...updates }
-  const examDatePostponed = updates.examDate !== undefined && updates.examDate > exam.examDate
+  const examDatePostponed = updates.examDate != null && exam.examDate != null && updates.examDate > exam.examDate
   if (examDatePostponed && merged.startDate < formatISODate(new Date())) {
     merged.startDate = formatISODate(new Date())
   }
   const studyPlan = updates.studyPlan ?? calculateStudyPlan(merged, exam.studyPlan)
   const { error } = await supabase
     .from("dynamic_exams")
-    .update({ name: merged.name, start_date: merged.startDate, exam_date: merged.examDate, type: merged.examType ?? null, cfu: merged.cfu ?? null, material: merged.material, study_plan: studyPlan })
+    .update({ name: merged.name, start_date: merged.startDate, exam_date: merged.examDate, type: merged.examType ?? null, cfu: merged.cfu ?? null, material: merged.material, study_plan: studyPlan, status: merged.status })
     .eq("id", exam.id)
   if (error) throw error
   await persistRebalancedActiveExams()

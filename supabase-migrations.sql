@@ -104,16 +104,22 @@ CREATE TABLE IF NOT EXISTS dynamic_exams (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   start_date DATE NOT NULL,
-  exam_date DATE NOT NULL,
+  exam_date DATE,
   type TEXT CHECK (type IN ('Scritto', 'Orale')),
   material JSONB NOT NULL DEFAULT '{}'::JSONB,
   study_plan JSONB NOT NULL DEFAULT '{}'::JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived'))
+  status TEXT NOT NULL DEFAULT 'planning' CHECK (status IN ('active', 'completed', 'archived', 'planning'))
 );
 
 -- Idempotente per i database dove dynamic_exams esisteva già senza la colonna type
 ALTER TABLE dynamic_exams ADD COLUMN IF NOT EXISTS type TEXT CHECK (type IN ('Scritto', 'Orale'));
+
+-- Idempotente: rende exam_date opzionale e introduce lo status "planning" (esami senza data ancora)
+ALTER TABLE dynamic_exams ALTER COLUMN exam_date DROP NOT NULL;
+ALTER TABLE dynamic_exams ALTER COLUMN status SET DEFAULT 'planning';
+ALTER TABLE dynamic_exams DROP CONSTRAINT IF EXISTS dynamic_exams_status_check;
+ALTER TABLE dynamic_exams ADD CONSTRAINT dynamic_exams_status_check CHECK (status IN ('active', 'completed', 'archived', 'planning'));
 
 ALTER TABLE dynamic_exams ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own dynamic exams" ON dynamic_exams;

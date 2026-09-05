@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { supabase, type UserProgress } from "@/lib/supabase/client"
-import type { SubjectKey, LoggedSession, CatchupItem } from "@/lib/planner/types"
+import type { SubjectKey, LoggedSession } from "@/lib/planner/types"
 
 type SyncStatus = "idle" | "syncing" | "error"
 
@@ -346,52 +346,6 @@ export function useSupabaseSync() {
   )
 
   /**
-   * Carica catchup da Supabase
-   */
-  const loadCatchupFromSupabase = useCallback(
-    async (): Promise<CatchupItem[]> => {
-      try {
-        const { data: user } = await supabase.auth.getUser()
-        if (!user.user) return []
-
-        const { data, error } = await supabase
-          .from("user_catchup")
-          .select("*")
-          .eq("user_id", user.user.id)
-          .order("created_at", { ascending: true })
-
-        if (error) {
-          console.warn("Could not load catchup from Supabase:", error)
-          return []
-        }
-
-        const result: CatchupItem[] = []
-        if (data) {
-          for (const row of data) {
-            result.push({
-              id: row.catchup_id,
-              origDay: row.orig_day,
-              origIdx: row.orig_idx,
-              sub: row.sub,
-              dur: row.dur,
-              topic: row.topic,
-              targetDay: row.target_day,
-              done: row.done,
-              createdAt: new Date(row.created_at).getTime(),
-            })
-          }
-        }
-
-        return result
-      } catch (err) {
-        console.error("Load catchup error:", err)
-        return []
-      }
-    },
-    []
-  )
-
-  /**
    * Sincronizza daily session
    */
   const syncDaily = useCallback(
@@ -618,58 +572,6 @@ export function useSupabaseSync() {
     [isOnline]
   )
 
-  /**
-   * Sincronizza catchup item
-   */
-  const syncCatchup = useCallback(
-    async (catchup: CatchupItem) => {
-      if (!isOnline) {
-        saveCatchupToLocalStorage(catchup)
-        return
-      }
-
-      try {
-        setSyncStatus("syncing")
-
-        const { data: user } = await supabase.auth.getUser()
-        if (!user.user) {
-          saveCatchupToLocalStorage(catchup)
-          setSyncStatus("idle")
-          return
-        }
-
-        const { error } = await supabase.from("user_catchup").upsert(
-          {
-            user_id: user.user.id,
-            catchup_id: catchup.id,
-            orig_day: catchup.origDay,
-            orig_idx: catchup.origIdx,
-            sub: catchup.sub,
-            dur: catchup.dur,
-            topic: catchup.topic,
-            target_day: catchup.targetDay,
-            done: catchup.done,
-            created_at: new Date(catchup.createdAt).toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id, catchup_id" }
-        )
-
-        if (error) {
-          console.warn("Supabase catchup sync error:", error)
-          saveCatchupToLocalStorage(catchup)
-        }
-
-        setSyncStatus("idle")
-      } catch (err) {
-        console.error("Catchup sync error:", err)
-        saveCatchupToLocalStorage(catchup)
-        setSyncStatus("error")
-      }
-    },
-    [isOnline]
-  )
-
   return {
     syncTopic,
     syncTopicQuiz,
@@ -679,13 +581,11 @@ export function useSupabaseSync() {
     syncConf,
     syncCheck,
     syncSession,
-    syncCatchup,
     loadDailyFromSupabase,
     loadNotesFromSupabase,
     loadConfFromSupabase,
     loadCheckFromSupabase,
     loadSessionsFromSupabase,
-    loadCatchupFromSupabase,
     syncStatus,
     isOnline,
   }
@@ -784,20 +684,6 @@ function saveSessionToLocalStorage(session: LoggedSession) {
     const data = JSON.parse(storage)
     data.push({ ...session, timestamp: new Date().toISOString() })
     localStorage.setItem("planner.sessions.backup", JSON.stringify(data))
-  } catch {
-    // Silently fail
-  }
-}
-
-/**
- * Salva catchup in localStorage
- */
-function saveCatchupToLocalStorage(catchup: CatchupItem) {
-  try {
-    const storage = localStorage.getItem("planner.catchup.backup") || "{}"
-    const data = JSON.parse(storage)
-    data[catchup.id] = { ...catchup, timestamp: new Date().toISOString() }
-    localStorage.setItem("planner.catchup.backup", JSON.stringify(data))
   } catch {
     // Silently fail
   }

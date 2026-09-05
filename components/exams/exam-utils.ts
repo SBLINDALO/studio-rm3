@@ -1,7 +1,9 @@
 import type { DynamicExam } from "@/lib/planner/types"
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 
+// Esami "planning" non hanno ancora una data: nessun conto alla rovescia possibile
 export function daysRemaining(exam: DynamicExam): number {
+  if (exam.examDate === null) return Infinity
   const today = parseISODate(formatISODate(new Date()))
   const examDate = parseISODate(exam.examDate)
   return Math.ceil((examDate.getTime() - today.getTime()) / 86_400_000)
@@ -9,6 +11,7 @@ export function daysRemaining(exam: DynamicExam): number {
 
 // Conto alla rovescia con precisione oraria per esami entro le prossime 48 ore
 export function countdownLabel(exam: DynamicExam): string {
+  if (exam.examDate === null) return "Senza data"
   const days = daysRemaining(exam)
   if (days > 1) return `${days} giorni`
   const examEndOfDay = parseISODate(exam.examDate)

@@ -75,9 +75,6 @@ export function AssistantDrawer({ open, onClose, data }: Props) {
     if (snapshot.todayPlan.some((t) => !t.done)) {
       out.push("Cosa devo studiare adesso?")
     }
-    if (snapshot.skipped.length > 0) {
-      out.push(`Come recupero i ${snapshot.skipped.length} argomenti arretrati?`)
-    }
     const weakest = [...snapshot.progress.bySubject]
       .filter((s) => s.total > 0)
       .sort((a, b) => a.pct - b.pct)[0]

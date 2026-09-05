@@ -126,7 +126,7 @@ export function ExamDetails({ exam, onBack, onEdit }: Props) {
         <p className="mt-1 text-xs text-stone-500">Gli ultimi 4 giorni prima dell'esame sono dedicati al ripasso.</p>
         <div className="mt-3 grid grid-cols-4 gap-2">
           {Array.from({ length: 4 }, (_, index) => {
-            const date = parseISODate(exam.examDate)
+            const date = parseISODate(exam.examDate ?? formatISODate(new Date()))
             date.setDate(date.getDate() - 4 + index)
             const day = exam.studyPlan.dailySchedule[formatISODate(date)]
             return <div key={index} className={`rounded-xl border px-2 py-2 text-center text-[11px] ${day?.isReview ? "border-amber-200 bg-amber-50 text-amber-800" : "border-stone-200 text-stone-400"}`}>{date.toLocaleDateString("it-IT", { day: "numeric", month: "short" })}</div>

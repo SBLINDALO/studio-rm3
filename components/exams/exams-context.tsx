@@ -17,13 +17,14 @@ import {
 interface ExamsContextValue {
   exams: DynamicExam[]
   activeExams: DynamicExam[]
+  planningExams: DynamicExam[]
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
   archiveExam: (id: string) => Promise<void>
   removeExam: (id: string) => Promise<void>
   restoreExam: (id: string) => Promise<void>
-  updateExamMaterial: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">>) => Promise<void>
+  updateExamMaterial: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu" | "status">>) => Promise<void>
   setDayCompletion: (exam: DynamicExam, date: string, completed: boolean) => Promise<void>
   markDayAheadAsCompleted: (examId: string, date: string) => Promise<void>
 }
@@ -119,7 +120,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateExamMaterial = useCallback(
-    async (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">>) => {
+    async (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu" | "status">>) => {
       const { dynamicExams } = await updateExamMaterialInSupabase(exam, updates)
       setExams(dynamicExams)
     },
@@ -182,10 +183,12 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const activeExams = useMemo(() => exams.filter((exam) => exam.status === "active"), [exams])
+  const planningExams = useMemo(() => exams.filter((exam) => exam.status === "planning"), [exams])
 
   const value: ExamsContextValue = {
     exams,
     activeExams,
+    planningExams,
     loading,
     error,
     refresh,

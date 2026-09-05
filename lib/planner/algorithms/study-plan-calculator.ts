@@ -48,6 +48,17 @@ export function calculateMaterialQuantity(material: DynamicExam["material"]): { 
 }
 
 export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan): StudyPlan {
+  if (exam.examDate === null) {
+    return {
+      totalDaysAvailable: 0,
+      studyDaysPerWeek: 5,
+      hoursPerDay: { min: 1, max: 1.5 },
+      reviewDaysBefore: 4,
+      dailySchedule: {},
+      planStatus: "no-date",
+    }
+  }
+
   const start = parseISODate(exam.startDate)
   const examDate = parseISODate(exam.examDate)
   const totalDaysAvailable = daysBetween(start, examDate)

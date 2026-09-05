@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { TrendingUp, GraduationCap, AlertTriangle, Settings } from "lucide-react"
+import { TrendingUp, GraduationCap, Settings } from "lucide-react"
 import type { SubjectKey } from "@/lib/planner/types"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useExams } from "@/components/exams/exams-context"
@@ -23,8 +23,6 @@ interface Props {
   globalPct: number
   globalDone: number
   globalTotal: number
-  skippedCount: number
-  onOpenCatchup: () => void
   onOpenSettings: () => void
   getProgress: (sub: SubjectKey) => { done: number; total: number; pct: number }
   appName: string
@@ -34,8 +32,6 @@ export function Header({
   globalPct,
   globalDone,
   globalTotal,
-  skippedCount,
-  onOpenCatchup,
   onOpenSettings,
   getProgress,
   appName,
@@ -136,31 +132,6 @@ export function Header({
           </h1>
           {nextExam && <p className="mt-1 text-[11px] text-stone-300">Prossimo: {nextExam.name} · {countdownLabel(nextExam)} · {nextExam.examDate}</p>}
         </div>
-
-        <AnimatePresence>
-          {skippedCount > 0 && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              whileTap={{ scale: 0.96 }}
-              onClick={onOpenCatchup}
-              className="group relative mt-0.5 flex flex-shrink-0 items-center gap-1.5 rounded-full border bg-rose-50/70 px-3 py-1.5 text-[11px] font-medium text-rose-900 shadow-sm transition-all hover:bg-rose-50 hover:shadow"
-              style={{ borderColor: "color-mix(in oklch, var(--accent-urgent) 30%, transparent)" }}
-              aria-label={`${skippedCount} argomenti arretrati. Apri piano di recupero`}
-            >
-              <motion.span
-                animate={{ rotate: [0, -6, 6, -6, 0] }}
-                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 4 }}
-                className="flex items-center text-rose-600"
-              >
-                <AlertTriangle size={12} strokeWidth={2.25} />
-              </motion.span>
-              <span className="tabular-nums">{skippedCount}</span>
-              <span className="hidden sm:inline">arretrat{skippedCount === 1 ? "o" : "i"}</span>
-            </motion.button>
-          )}
-        </AnimatePresence>
 
         <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
           <ThemeToggle />

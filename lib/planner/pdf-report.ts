@@ -75,7 +75,8 @@ export async function exportFullProgressReportPdf(exams: DynamicExam[]) {
 
   let y = 42
   const pageHeight = 297
-  for (const exam of [...exams].sort((a, b) => a.examDate.localeCompare(b.examDate))) {
+  // invariant: solo esami "active" arrivano qui, examDate è sempre valorizzato
+  for (const exam of [...exams].sort((a, b) => (a.examDate as string).localeCompare(b.examDate as string))) {
     if (y > pageHeight - 45) {
       doc.addPage()
       y = 20

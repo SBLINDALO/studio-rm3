@@ -17,13 +17,11 @@ import { TrackerTab } from "@/components/planner/tracker-tab"
 import { ReviewTab } from "@/components/planner/review-tab"
 import { TimerTab } from "@/components/planner/timer-tab"
 import { FocusView } from "@/components/planner/focus-view"
-import { CatchupView } from "@/components/planner/catchup-view"
 import { AssistantFab } from "@/components/planner/assistant-fab"
 import { AssistantDrawer } from "@/components/planner/assistant-drawer"
 import { ProgressTab } from "@/components/planner/progress-tab"
 import { NotificationSettings } from "@/components/planner/notification-settings"
 import { Toast, type ToastState } from "@/components/planner/toast"
-import { scanSkipped } from "@/lib/planner/catchup"
 import { ExamsProvider } from "@/components/exams/exams-context"
 import { ensureAnonymousSession } from "@/lib/supabase/session"
 
@@ -40,11 +38,6 @@ function PlannerPageContent() {
     logSession,
     getProgress,
     globalProgress,
-    markRecovered,
-    dismissSkipped,
-    addCatchupItems,
-    toggleCatchupDone,
-    removeCatchupItem,
     attachDoc,
     removeDoc,
     addCustomExam,
@@ -68,10 +61,8 @@ function PlannerPageContent() {
     })
   }, [])
   const [toast, setToast] = useState<ToastState | null>(null)
-  const [catchupOpen, setCatchupOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const skippedNotifiedRef = useRef(false)
 
   // Timer state
   // Runtime state (not persisted — resets on page reload)
@@ -82,7 +73,7 @@ function PlannerPageContent() {
   const [focusView, setFocusView] = useState(false)
 
   // Persisted preferences — survive reloads and home-screen launches
-  const [timerSubject, setTimerSubject] = usePersistedState<SubjectKey | null>(
+  const [timerSubject, setTimerSubject] = usePersistedState<string | null>(
     "timer.subject",
     null,
   )
@@ -324,26 +315,6 @@ function PlannerPageContent() {
 
   const gp = useMemo(() => globalProgress(), [globalProgress])
 
-  // Compute skipped sessions (auto-detection) and a per-day count for the Schedule badges
-  const skippedItems = useMemo(() => scanSkipped(data), [data])
-  const skippedByDay = useMemo(() => {
-    const acc: Record<string, number> = {}
-    for (const s of skippedItems) {
-      acc[s.origDay] = (acc[s.origDay] ?? 0) + 1
-    }
-    return acc
-  }, [skippedItems])
-
-  // One-time toast notification when arrears are detected on load
-  useEffect(() => {
-    if (!loaded || skippedNotifiedRef.current) return
-    if (skippedItems.length > 0) {
-      skippedNotifiedRef.current = true
-      const n = skippedItems.length
-      showToast(`${n} ${n === 1 ? "argomento arretrato" : "argomenti arretrati"}`, "warn")
-    }
-  }, [loaded, skippedItems.length, showToast])
-
   // Titolo di pagina personalizzabile dalle impostazioni
   useEffect(() => {
     if (typeof document !== "undefined") document.title = appName
@@ -379,20 +350,9 @@ function PlannerPageContent() {
         onClose={() => setFocusView(false)}
       />
 
-      <CatchupView
-        open={catchupOpen}
-        onClose={() => setCatchupOpen(false)}
-        data={data}
-        onMarkRecovered={markRecovered}
-        onDismissSkipped={dismissSkipped}
-        onAcceptCatchup={addCatchupItems}
-        onRemoveCatchupItem={removeCatchupItem}
-        onShowToast={showToast}
-      />
-
       <AssistantFab
         onClick={() => setAssistantOpen(true)}
-        hidden={assistantOpen || catchupOpen || focusView}
+        hidden={assistantOpen || focusView}
       />
       <AssistantDrawer
         open={assistantOpen}
@@ -413,8 +373,6 @@ function PlannerPageContent() {
         globalPct={gp.pct}
         globalDone={gp.done}
         globalTotal={gp.total}
-        skippedCount={skippedItems.length}
-        onOpenCatchup={() => setCatchupOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         getProgress={getProgress}
         appName={appName}
@@ -432,10 +390,6 @@ function PlannerPageContent() {
             {tab === "today" && (
               <TodayTab
                 data={data}
-                toggleDaily={handleToggleDaily}
-                toggleCatchupDone={toggleCatchupDone}
-                attachDoc={attachDoc}
-                removeDoc={removeDoc}
                 addCustomExam={addCustomExam}
                 updateExam={updateExam}
                 archiveExam={archiveExam}
@@ -446,8 +400,6 @@ function PlannerPageContent() {
                 streak={streak}
                 todayFocusMin={todayFocusMin}
                 todayFocusCount={todayFocusCount}
-                skippedCount={skippedItems.length}
-                onOpenCatchup={() => setCatchupOpen(true)}
                 onNavigate={setTab}
                 onShowToast={showToast}
               />
@@ -456,10 +408,8 @@ function PlannerPageContent() {
               <ScheduleTab
                 data={data}
                 toggleDaily={handleToggleDaily}
-                toggleCatchupDone={toggleCatchupDone}
                 attachDoc={attachDoc}
                 removeDoc={removeDoc}
-                skippedByDay={skippedByDay}
               />
             )}
             {tab === "tracker" && (

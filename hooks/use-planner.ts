@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { ArchivedExam, CatchupItem, CustomExam, DynamicExam, PlannerData, SubjectKey, TopicStatus, LoggedSession, StudyDoc } from "@/lib/planner/types"
+import type { ArchivedExam, CustomExam, DynamicExam, PlannerData, SubjectKey, TopicStatus, LoggedSession, StudyDoc } from "@/lib/planner/types"
 import { SUBJECTS, TOPICS } from "@/lib/planner/data"
 import { getTodayStr } from "@/lib/planner/helpers"
 import { useSupabaseSync } from "./use-supabase-sync"
@@ -18,9 +18,7 @@ const initialData: PlannerData = {
   conf: {},
   check: {},
   sessions: [],
-  catchup: [],
   quiz: {},
-  dismissedSkips: {},
   docs: {},
   customExams: [],
   archivedExams: [],
@@ -34,7 +32,7 @@ export function usePlanner() {
   const [loaded, setLoaded] = useState(false)
   const [dailyStats, setDailyStats] = useState({ chaptersCompleted: 0, totalTimeSpent: 0, examsStudied: [] as string[] })
   const [streak, setStreak] = useState(0)
-  const { syncTopic, syncTopicQuiz, loadProgressFromSupabase, syncDaily, syncNote, syncConf, syncCheck, syncSession, syncCatchup, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase, loadCatchupFromSupabase } = useSupabaseSync()
+  const { syncTopic, syncTopicQuiz, loadProgressFromSupabase, syncDaily, syncNote, syncConf, syncCheck, syncSession, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase } = useSupabaseSync()
 
   useEffect(() => {
     const loadData = async () => {
@@ -49,22 +47,19 @@ export function usePlanner() {
           if (!parsed.notes) parsed.notes = {}
           if (!parsed.conf) parsed.conf = {}
           if (!parsed.check) parsed.check = {}
-          if (!parsed.catchup) parsed.catchup = []
           if (!parsed.quiz) parsed.quiz = {}
-          if (!parsed.dismissedSkips) parsed.dismissedSkips = {}
           if (!parsed.docs) parsed.docs = {}
           // Non caricare customExams e archivedExams da localStorage
         }
 
         // Carica tutti i dati da Supabase e unisci
-        const [supabaseProgress, supabaseDaily, supabaseNotes, supabaseConf, supabaseCheck, supabaseSessions, supabaseCatchup] = await Promise.all([
+        const [supabaseProgress, supabaseDaily, supabaseNotes, supabaseConf, supabaseCheck, supabaseSessions] = await Promise.all([
           loadProgressFromSupabase(),
           loadDailyFromSupabase(),
           loadNotesFromSupabase(),
           loadConfFromSupabase(),
           loadCheckFromSupabase(),
           loadSessionsFromSupabase(),
-          loadCatchupFromSupabase(),
         ])
 
         // Unisci topics
@@ -105,11 +100,6 @@ export function usePlanner() {
         const existingSessionIds = new Set(parsed.sessions.map(s => s.id))
         const newSessions = supabaseSessions.filter(s => !existingSessionIds.has(s.id))
         parsed.sessions = [...parsed.sessions, ...newSessions]
-
-        // Unisci catchup (merge senza duplicati)
-        const existingCatchupIds = new Set(parsed.catchup.map(c => c.id))
-        const newCatchup = supabaseCatchup.filter(c => !existingCatchupIds.has(c.id))
-        parsed.catchup = [...parsed.catchup, ...newCatchup]
 
         // Carica esami da Supabase
         const userId = "test-user"
@@ -159,7 +149,7 @@ export function usePlanner() {
       }
     }
     loadData()
-  }, [loadProgressFromSupabase, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase, loadCatchupFromSupabase])
+  }, [loadProgressFromSupabase, loadDailyFromSupabase, loadNotesFromSupabase, loadConfFromSupabase, loadCheckFromSupabase, loadSessionsFromSupabase])
 
   const save = useCallback((next: PlannerData) => {
     // Non salvare customExams e archivedExams su localStorage, sono gestiti da Supabase
@@ -263,7 +253,7 @@ export function usePlanner() {
   )
 
   const addCustomExam = useCallback(
-    async (exam: Omit<DynamicExam, "id" | "createdAt" | "status">) => {
+    async (exam: Omit<DynamicExam, "id" | "createdAt">) => {
       // Non intercettare l'errore qui: deve propagarsi al chiamante (form) per essere mostrato all'utente
       const result = await addExamToSupabase(exam)
       setData(prev => ({ ...prev, ...result }))
@@ -274,7 +264,7 @@ export function usePlanner() {
   const updateExam = useCallback(
     async (
       exam: DynamicExam,
-      updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">>,
+      updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu" | "status">>,
     ) => {
       const result = await updateExamInSupabase(exam, updates)
       setData(prev => ({ ...prev, ...result }))
@@ -403,82 +393,6 @@ export function usePlanner() {
     return { ...r, pct: r.total === 0 ? 0 : Math.round((r.done / r.total) * 100) }
   }, [getProgress])
 
-  // Mark a skipped item as "retroactively done" (recovered)
-  const markRecovered = useCallback(
-    (origDay: string, origIdx: number) => {
-      save({
-        ...data,
-        daily: { ...data.daily, [`${origDay}_${origIdx}`]: true },
-      })
-    },
-    [data, save],
-  )
-
-  // Permanently dismiss a skipped item (user gives up on it)
-  const dismissSkipped = useCallback(
-    (origDay: string, origIdx: number) => {
-      save({
-        ...data,
-        dismissedSkips: { ...data.dismissedSkips, [`${origDay}_${origIdx}`]: true },
-      })
-    },
-    [data, save],
-  )
-
-  // Undo a dismissal (bring item back into the skipped queue)
-  const undoDismiss = useCallback(
-    (origDay: string, origIdx: number) => {
-      const next = { ...data.dismissedSkips }
-      delete next[`${origDay}_${origIdx}`]
-      save({ ...data, dismissedSkips: next })
-    },
-    [data, save],
-  )
-
-  // Append new catchup items (from an accepted proposal)
-  const addCatchupItems = useCallback(
-    (items: CatchupItem[]) => {
-      if (items.length === 0) return
-      const newCatchup = [...(data.catchup ?? []), ...items]
-      save({ ...data, catchup: newCatchup })
-      
-      // Sincronizza con Supabase
-      items.forEach(item => {
-        syncCatchup(item).catch(() => {
-          // Fallback già gestito
-        })
-      })
-    },
-    [data, save, syncCatchup],
-  )
-
-  // Toggle the done state of a catchup item (user completed the rescheduled work)
-  const toggleCatchupDone = useCallback(
-    (id: string) => {
-      const next = (data.catchup ?? []).map((c) =>
-        c.id === id ? { ...c, done: !c.done } : c,
-      )
-      save({ ...data, catchup: next })
-      
-      // Sincronizza con Supabase
-      const updatedItem = next.find(c => c.id === id)
-      if (updatedItem) {
-        syncCatchup(updatedItem).catch(() => {
-          // Fallback già gestito
-        })
-      }
-    },
-    [data, save, syncCatchup],
-  )
-
-  // Remove a rescheduled catchup item (brings it back into the skipped queue)
-  const removeCatchupItem = useCallback(
-    (id: string) => {
-      save({ ...data, catchup: (data.catchup ?? []).filter((c) => c.id !== id) })
-    },
-    [data, save],
-  )
-
   const attachDoc = useCallback(
     (key: string, doc: StudyDoc) => {
       save({ ...data, docs: { ...data.docs, [key]: doc } })
@@ -508,12 +422,6 @@ export function usePlanner() {
     logSession,
     getProgress,
     globalProgress,
-    markRecovered,
-    dismissSkipped,
-    undoDismiss,
-    addCatchupItems,
-    toggleCatchupDone,
-    removeCatchupItem,
     attachDoc,
     removeDoc,
     addCustomExam,

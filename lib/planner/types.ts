@@ -3,7 +3,7 @@ export type TimerMode = "focus" | "break"
 export type TopicStatus = "done" | "review" | null
 
 export interface StudyPlan {
-  planStatus?: "ready" | "review-only" | "too-late"
+  planStatus?: "ready" | "review-only" | "too-late" | "no-date"
   totalDaysAvailable: number
   studyDaysPerWeek: 5
   hoursPerDay: { min: number; max: number }
@@ -59,7 +59,7 @@ export interface DynamicExam {
   id: string
   name: string
   startDate: string
-  examDate: string
+  examDate: string | null
   examType: "Scritto" | "Orale" | null
   cfu: 6 | 12 | null
   material: {
@@ -71,7 +71,7 @@ export interface DynamicExam {
   }
   studyPlan: StudyPlan
   createdAt: number
-  status: "active" | "completed" | "archived"
+  status: "active" | "completed" | "archived" | "planning"
 }
 
 // Riflette 1:1 le colonne della tabella dynamic_exams (snake_case)
@@ -80,12 +80,12 @@ export interface DynamicExamRow {
   user_id: string
   name: string
   start_date: string
-  exam_date: string
+  exam_date: string | null
   type: "Scritto" | "Orale" | null
   material: DynamicExam["material"]
   study_plan: StudyPlan
   created_at: number
-  status: "active" | "completed" | "archived"
+  status: "active" | "completed" | "archived" | "planning"
 }
 
 export interface ActiveRecallQuestion {
@@ -159,45 +159,10 @@ export interface Booking {
 export interface LoggedSession {
   id: number
   date: string
-  subject: SubjectKey | null
+  subject: string | null
   duration: number
   mode: TimerMode
   startTime: string
-}
-
-export interface CatchupItem {
-  id: string
-  origDay: string // original planned day "YYYY-MM-DD"
-  origIdx: number // index within DAILY[origDay].sessions
-  sub: SubjectKey
-  dur: string
-  topic: string
-  targetDay: string // rescheduled-to day "YYYY-MM-DD"
-  done: boolean
-  createdAt: number
-}
-
-export interface SkippedItem {
-  id: string
-  origDay: string
-  origIdx: number
-  sub: SubjectKey
-  dur: string
-  topic: string
-  examISO: string
-}
-
-export type DayItemKind = "planned" | "catchup"
-
-export interface DayItem {
-  kind: DayItemKind
-  sub: SubjectKey
-  dur: string
-  topic: string
-  done: boolean
-  plannedIdx?: number
-  catchupId?: string
-  origDay?: string
 }
 
 export interface StudyDoc {
@@ -249,8 +214,6 @@ export interface PlannerData {
   conf: Record<string, number>
   check: Record<string, number>
   sessions: LoggedSession[]
-  catchup: CatchupItem[]
-  dismissedSkips: Record<string, true>
   docs: Record<string, StudyDoc>
   customExams: CustomExam[]
   dynamicExams: DynamicExam[]

@@ -90,10 +90,7 @@ export function AssistantChat({ snapshot, suggestedPrompts, seedPrompt, onSeedCo
             </div>
             <p className="mt-1.5 text-[13.5px] leading-snug text-stone-800">
               Ciao! Ho il tuo piano sotto gli occhi:{" "}
-              <strong className="font-semibold">{snapshot.progress.global.pct}% completato</strong>,{" "}
-              {snapshot.skipped.length > 0
-                ? `${snapshot.skipped.length} argomenti arretrati.`
-                : "nessun arretrato."}{" "}
+              <strong className="font-semibold">{snapshot.progress.global.pct}% completato</strong>.{" "}
               Cosa ti aiuto a capire?
             </p>
           </motion.div>

@@ -16,19 +16,12 @@ import {
   Cell,
   Legend,
 } from "recharts"
-import { SUBJECTS, TOPICS } from "@/lib/planner/data"
-import type { LoggedSession, SubjectKey, TopicStatus } from "@/lib/planner/types"
+import type { LoggedSession } from "@/lib/planner/types"
 import { parseISODate } from "@/lib/planner/utils/dates"
+import { useExams } from "@/components/exams/exams-context"
+import { calculateMaterialQuantity } from "@/lib/planner/algorithms/study-plan-calculator"
 
-const SUBJECT_COLORS: Record<SubjectKey, string> = {
-  psico: "#E11D48",
-  radio: "#4F46E5",
-  est: "#D97706",
-  scog: "#059669",
-  genere: "#7C3AED",
-}
-
-const SUBJECT_ORDER: SubjectKey[] = ["psico", "radio", "est", "scog", "genere"]
+const EXAM_COLORS = ["#F43F5E", "#6366F1", "#F59E0B", "#10B981"]
 
 function formatDayLabel(date: Date) {
   return `${date.getDate()}/${date.getMonth() + 1}`
@@ -49,32 +42,19 @@ function parseDate(value: string) {
 
 interface StatsViewProps {
   sessions: LoggedSession[]
-  topics: Record<string, TopicStatus>
 }
 
-export function StatsView({ sessions, topics }: StatsViewProps) {
+export function StatsView({ sessions }: StatsViewProps) {
+  const { activeExams } = useExams()
   const lastWeek = useMemo(() => buildLast7Days(), [])
 
   const formattedSubjectData = useMemo(() => {
-    const totals = SUBJECT_ORDER.reduce<Partial<Record<SubjectKey, number>>>(
-      (acc, subject) => ({ ...acc, [subject]: 0 }),
-      {}
-    )
-
-    const sessionData = sessions.filter((session) => session.subject && session.mode === "focus")
-
-    sessionData.forEach((session) => {
-      if (session.subject) {
-        totals[session.subject] = (totals[session.subject] ?? 0) + session.duration
-      }
-    })
-
-    return SUBJECT_ORDER.map((subject) => ({
-      subject: SUBJECTS[subject].short,
-      hours: Number(((totals[subject] ?? 0) / 60).toFixed(1)),
-      subjectKey: subject,
+    return activeExams.map((exam, index) => ({
+      subject: exam.name,
+      hours: Number((sessions.filter((session) => session.subject === exam.id && session.mode === "focus").reduce((sum, session) => sum + session.duration, 0) / 60).toFixed(1)),
+      color: EXAM_COLORS[index % EXAM_COLORS.length],
     }))
-  }, [sessions])
+  }, [activeExams, sessions])
 
   const dailyTrendData = useMemo(() => {
     const amounts = lastWeek.map((date) => ({
@@ -103,18 +83,20 @@ export function StatsView({ sessions, topics }: StatsViewProps) {
     }))
   }, [sessions, lastWeek])
 
-  const totalTopics = useMemo(
-    () => Object.values(TOPICS).reduce((sum, topics) => sum + topics.length, 0),
-    []
-  )
-
-  const completedTopics = useMemo(
-    () => Object.values(topics).filter((status) => status === "done").length,
-    [topics]
-  )
+  const { totalTopics, completedTopics } = useMemo(() => activeExams.reduce((totals, exam) => {
+    const { topics } = calculateMaterialQuantity(exam.material)
+    const topicDays = new Map<string, string>()
+    Object.entries(exam.studyPlan.dailySchedule).forEach(([date, day]) => day.topics?.forEach((topic) => topicDays.set(topic, date)))
+    totals.totalTopics += topics.length
+    totals.completedTopics += topics.filter((topic) => {
+      const date = topicDays.get(topic)
+      return date ? exam.studyPlan.dailySchedule[date]?.completed : false
+    }).length
+    return totals
+  }, { totalTopics: 0, completedTopics: 0 }), [activeExams])
 
   const globalCompletion = useMemo(
-    () => Math.round((completedTopics / totalTopics) * 100),
+    () => totalTopics ? Math.round((completedTopics / totalTopics) * 100) : 0,
     [completedTopics, totalTopics]
   )
 
@@ -157,7 +139,7 @@ export function StatsView({ sessions, topics }: StatsViewProps) {
                   <Tooltip formatter={(value: number) => `${value}h`} />
                   <Bar dataKey="hours" radius={[12, 12, 0, 0]}>
                     {formattedSubjectData.map((entry) => (
-                      <Cell key={entry.subject} fill={SUBJECT_COLORS[entry.subjectKey]} />
+                      <Cell key={entry.subject} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -216,14 +198,14 @@ export function StatsView({ sessions, topics }: StatsViewProps) {
               Legenda materie
             </div>
             <div className="space-y-2">
-              {SUBJECT_ORDER.map((subject) => (
-                <div key={subject} className="flex items-center justify-between gap-3 text-[13px] text-stone-700">
+              {formattedSubjectData.map((exam) => (
+                <div key={exam.subject} className="flex items-center justify-between gap-3 text-[13px] text-stone-700">
                   <div className="flex items-center gap-2">
-                    <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: SUBJECT_COLORS[subject] }} />
-                    {SUBJECTS[subject].short}
+                    <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: exam.color }} />
+                    {exam.subject}
                   </div>
                   <span className="tabular-nums text-stone-900">
-                    {formattedSubjectData.find((entry) => entry.subjectKey === subject)?.hours ?? 0}h
+                    {exam.hours}h
                   </span>
                 </div>
               ))}

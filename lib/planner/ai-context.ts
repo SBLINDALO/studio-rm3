@@ -1,6 +1,5 @@
-import type { PlannerData, SubjectKey, SkippedItem } from "./types"
+import type { PlannerData, SubjectKey } from "./types"
 import { SUBJECTS, TOPICS, DAILY, BOOKINGS } from "./data"
-import { getDayItems, scanSkipped } from "./catchup"
 import { getTodayStr } from "./helpers"
 import { parseISODate } from "./utils/dates"
 
@@ -11,8 +10,7 @@ export interface AiSnapshot {
     global: { done: number; total: number; pct: number }
     bySubject: Array<{ key: SubjectKey; name: string; done: number; total: number; pct: number }>
   }
-  todayPlan: Array<{ sub: string; dur: string; topic: string; done: boolean; catchup: boolean }>
-  skipped: Array<{ day: string; sub: string; topic: string; dur: string }>
+  todayPlan: Array<{ sub: string; dur: string; topic: string; done: boolean }>
   nextExam: { name: string; date: string; daysUntil: number } | null
   nextBooking: { name: string; date: string; daysUntil: number } | null
   focusTodayMin: number
@@ -43,23 +41,12 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
   const gTotal = bySubject.reduce((s, x) => s + x.total, 0)
   const gPct = gTotal ? Math.round((gDone / gTotal) * 100) : 0
 
-  // Today's plan (planned + catchup)
-  const items = getDayItems(todayKey, data)
-  const todayPlan = items.map((it) => ({
-    sub: SUBJECTS[it.sub]?.name ?? it.sub,
-    dur: it.dur,
-    topic: it.topic,
-    done: it.done,
-    catchup: it.kind === "catchup",
-  }))
-
-  // Skipped arrears (top 8 by urgency)
-  const skippedAll: SkippedItem[] = scanSkipped(data)
-  const skipped = skippedAll.slice(0, 8).map((s) => ({
-    day: DAILY[s.origDay]?.label ?? s.origDay,
-    sub: SUBJECTS[s.sub]?.name ?? s.sub,
-    topic: s.topic,
-    dur: s.dur,
+  // Today's legacy plan, without the removed catchup queue.
+  const todayPlan = (entry?.sessions ?? []).map((session, index) => ({
+    sub: SUBJECTS[session.sub]?.name ?? session.sub,
+    dur: session.dur,
+    topic: session.topic,
+    done: !!data.daily[`${todayKey}_${index}`],
   }))
 
   // Next exam / booking
@@ -100,7 +87,6 @@ export function buildAiSnapshot(data: PlannerData): AiSnapshot {
       bySubject,
     },
     todayPlan,
-    skipped,
     nextExam,
     nextBooking,
     focusTodayMin,
@@ -125,7 +111,6 @@ export function renderSnapshotAsMarkdown(s: AiSnapshot | null | undefined): stri
       bySubject: Array.isArray(s?.progress?.bySubject) ? s.progress.bySubject : [],
     },
     todayPlan: Array.isArray(s?.todayPlan) ? s.todayPlan : [],
-    skipped: Array.isArray(s?.skipped) ? s.skipped : [],
     nextExam: s?.nextExam ?? null,
     nextBooking: s?.nextBooking ?? null,
     focusTodayMin: s?.focusTodayMin ?? 0,
@@ -157,19 +142,12 @@ export function renderSnapshotAsMarkdown(s: AiSnapshot | null | undefined): stri
     lines.push(`_Nessuna sessione pianificata oggi._`)
   } else {
     for (const t of safe.todayPlan) {
-      const tag = t.catchup ? " [RECUPERO]" : ""
       const done = t.done ? " ✓" : ""
-      lines.push(`- (${t.sub}, ${t.dur})${tag}${done}: ${t.topic}`)
+      lines.push(`- (${t.sub}, ${t.dur})${done}: ${t.topic}`)
     }
   }
   lines.push(``)
   lines.push(`## Sessioni di studio completate oggi: ${safe.focusTodayMin} minuti`)
   lines.push(``)
-  if (safe.skipped.length > 0) {
-    lines.push(`## Argomenti arretrati (${safe.skipped.length})`)
-    for (const sk of safe.skipped) {
-      lines.push(`- ${sk.day} — ${sk.sub} (${sk.dur}): ${sk.topic}`)
-    }
-  }
   return lines.join("\n")
 }

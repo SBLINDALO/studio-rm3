@@ -10,7 +10,7 @@ import { SPRING_SHEET } from "@/lib/planner/motion"
 interface Props {
   exam: CustomExam | null
   onClose: () => void
-  onSave: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">>) => void | Promise<void>
+  onSave: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu" | "status">>) => void | Promise<void>
 }
 
 const materialTypes: Array<{ value: DynamicExam["material"]["type"]; label: string }> = [
@@ -59,15 +59,20 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
 
   const close = () => { setError(""); onClose() }
 
+  const isPlanning = exam.status === "planning"
+  // Un esame "planning" non ha ancora una data: la prima data salvata lo attiva
+  const willActivate = isPlanning && !exam.examISO && !!date
+
   const save = async () => {
-    if (!name.trim() || !date) { setError("Inserisci nome e data dell'esame"); return }
-    if (startDate && startDate > date) { setError("L'inizio studio non può essere dopo la data dell'esame"); return }
+    if (!name.trim()) { setError("Inserisci il nome dell'esame"); return }
+    if (!isPlanning && !date) { setError("Inserisci nome e data dell'esame"); return }
+    if (startDate && date && startDate > date) { setError("L'inizio studio non può essere dopo la data dell'esame"); return }
     const material: DynamicExam["material"] = {
       type,
       totalPages: pages ? Number(pages) : undefined,
       notes: notes.trim() || undefined,
     }
-    if (!material.totalPages && !material.notes && !(exam.material?.files?.length)) {
+    if (date && !material.totalPages && !material.notes && !(exam.material?.files?.length)) {
       setError("Aggiungi almeno una fonte di materiale")
       return
     }
@@ -81,7 +86,7 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
       id: exam.id,
       name: exam.name,
       startDate: exam.startDate,
-      examDate: exam.examISO,
+      examDate: exam.examISO || null,
       examType: exam.examType === "Orale" ? "Orale" : "Scritto",
       cfu: exam.cfu === 12 ? 12 : 6,
       material: exam.material ?? { type: "notes" },
@@ -92,8 +97,10 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
 
     setSaving(true)
     try {
-      const updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu">> = { name: name.trim(), examDate: date, material, examType, cfu }
+      const updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu" | "status">> = { name: name.trim(), material, examType, cfu }
+      if (date) updates.examDate = date
       if (startDate && startDate !== exam.startDate) updates.startDate = startDate
+      if (willActivate) updates.status = "active"
       await onSave(dynamicExam, updates)
       close()
     } catch (err) {
@@ -120,8 +127,8 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
       <div className="flex items-center justify-between pb-3"><h2 className="text-[18px] font-semibold text-stone-900">Modifica esame</h2><button onClick={close} aria-label="Chiudi"><X size={18} /></button></div>
       <div className="space-y-3">
         <label className="block text-xs font-medium text-stone-600">Nome<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Es. Storia dell'arte" /></label>
-        <label className="block text-xs font-medium text-stone-600">Data esame<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" /></label>
-        <label className="block text-xs font-medium text-stone-600">Inizio studio<input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" />{exam.startDate && date > exam.examISO && exam.startDate < formatISODate(new Date()) && (!startDate || startDate === exam.startDate) && <span className="mt-1 block text-[11px] leading-snug text-amber-700">Data esame posticipata: l'inizio studio verrà riportato a oggi e il piano ripartirà da adesso. Per conservare la cronologia passata, imposta manualmente l'inizio studio a oggi.</span>}</label>
+        <label className="block text-xs font-medium text-stone-600">Data esame{isPlanning ? " (facoltativa)" : ""}<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" />{willActivate && <span className="mt-1 block text-[11px] leading-snug text-emerald-700">L'esame passerà da "in programmazione" ad "attivo" e il piano di studio verrà calcolato ora.</span>}</label>
+        <label className="block text-xs font-medium text-stone-600">Inizio studio<input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" />{exam.startDate && exam.examISO && date > exam.examISO && exam.startDate < formatISODate(new Date()) && (!startDate || startDate === exam.startDate) && <span className="mt-1 block text-[11px] leading-snug text-amber-700">Data esame posticipata: l'inizio studio verrà riportato a oggi e il piano ripartirà da adesso. Per conservare la cronologia passata, imposta manualmente l'inizio studio a oggi.</span>}</label>
         <div><p className="mb-1 text-xs font-medium text-stone-600">Tipo esame</p><div className="grid grid-cols-2 gap-2">{examTypes.map((item) => <button type="button" key={item.value} onClick={() => setExamType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${examType === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         <div><p className="mb-1 text-xs font-medium text-stone-600">CFU</p><div className="grid grid-cols-2 gap-2">{cfuOptions.map((item) => <button type="button" key={item.value} onClick={() => setCfu(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${cfu === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         <div><p className="mb-1 text-xs font-medium text-stone-600">Materiale</p><div className="grid grid-cols-4 gap-2">{materialTypes.map((item) => <button type="button" key={item.value} onClick={() => setType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${type === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>

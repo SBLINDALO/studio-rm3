@@ -76,22 +76,6 @@ export type UserSession = {
   created_at: string
 }
 
-// Tipo per user_catchup
-export type UserCatchup = {
-  id: string
-  user_id: string
-  catchup_id: string
-  orig_day: string
-  orig_idx: number
-  sub: string
-  dur: string
-  topic: string
-  target_day: string
-  done: boolean
-  created_at: string
-  updated_at: string
-}
-
 // Tipo per exams
 export type Exam = {
   id: string

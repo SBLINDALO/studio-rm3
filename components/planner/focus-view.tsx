@@ -1,11 +1,12 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { Play, Pause, X, Flame, Coffee } from "lucide-react"
-import { SUBJECTS, C } from "@/lib/planner/data"
-import { SubjectIcon } from "./subject-icon"
+import { Play, Pause, X, Flame, Coffee, Circle } from "lucide-react"
+import { useExams } from "@/components/exams/exams-context"
 import { fmtTime } from "@/lib/planner/helpers"
-import type { SubjectKey, TimerMode } from "@/lib/planner/types"
+import type { TimerMode } from "@/lib/planner/types"
+
+const EXAM_COLORS = ["#F43F5E", "#6366F1", "#F59E0B", "#10B981"]
 
 interface Props {
   open: boolean
@@ -13,7 +14,7 @@ interface Props {
   timerTotal: number
   timerActive: boolean
   timerMode: TimerMode
-  timerSubject: SubjectKey | null
+  timerSubject: string | null
   onToggle: () => void
   onClose: () => void
 }
@@ -28,7 +29,10 @@ export function FocusView({
   onToggle,
   onClose,
 }: Props) {
-  const accent = timerSubject ? C[timerSubject].dot : timerMode === "focus" ? "#E11D48" : "#059669"
+  const { activeExams } = useExams()
+  const selectedExamIndex = activeExams.findIndex((exam) => exam.id === timerSubject)
+  const selectedExam = activeExams[selectedExamIndex]
+  const accent = timerSubject ? EXAM_COLORS[Math.max(selectedExamIndex, 0) % EXAM_COLORS.length] : timerMode === "focus" ? "#E11D48" : "#059669"
   const progressPct = timerTotal ? (1 - timerRemaining / timerTotal) * 100 : 0
 
   return (
@@ -80,7 +84,7 @@ export function FocusView({
                 {timerMode === "focus" ? <Flame size={12} /> : <Coffee size={12} />}
                 {timerMode === "focus" ? "In sessione" : "Riposo"}
               </div>
-              {timerSubject && (
+              {timerSubject && selectedExam && (
                 <div
                   className="mx-auto mb-9 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px] font-bold"
                   style={{
@@ -89,8 +93,8 @@ export function FocusView({
                     borderColor: `${accent}30`,
                   }}
                 >
-                  <SubjectIcon sub={timerSubject} size={14} strokeWidth={3} />
-                  {SUBJECTS[timerSubject].short}
+                  <Circle size={14} strokeWidth={3} fill={accent} />
+                  {selectedExam.name}
                 </div>
               )}
             </motion.div>

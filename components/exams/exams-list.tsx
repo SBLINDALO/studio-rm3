@@ -91,7 +91,7 @@ export function ExamsList({ onSelectExam }: Props) {
               <h3 className="truncate text-sm font-semibold text-stone-900">{exam.name}</h3>
               {exam.status !== "active" && (
                 <span className="ml-auto shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500">
-                  {exam.status === "archived" ? "Archiviato" : "Completato"}
+                  {exam.status === "archived" ? "Archiviato" : exam.status === "planning" ? "In preparazione" : "Completato"}
                 </span>
               )}
             </div>

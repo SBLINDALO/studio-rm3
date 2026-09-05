@@ -1,14 +1,9 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Check, CalendarClock, Timer as TimerIcon, CheckCircle2, RotateCw, ArrowRight, Plus, X, Archive } from "lucide-react"
-import { useState } from "react"
-import { SUBJECTS, C, DAILY, BOOKINGS } from "@/lib/planner/data"
-import { SubjectIcon } from "./subject-icon"
-import { SkippedBanner } from "./skipped-banner"
-import { StudyDocViewer } from "./study-doc-viewer"
-import { daysUntil, fmtDuration, getTodayStr } from "@/lib/planner/helpers"
-import { getDayItems } from "@/lib/planner/catchup"
+import { Check, Timer as TimerIcon, CheckCircle2, ArrowRight, Plus, X, Archive } from "lucide-react"
+import { useMemo, useState } from "react"
+import { daysUntil, fmtDuration } from "@/lib/planner/helpers"
 import { AddExamModal } from "./add-exam-modal"
 import { EditExamModal } from "./edit-exam-modal"
 import { ExamArchive } from "./exam-archive"
@@ -27,17 +22,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import type { ArchivedExam, CustomExam, DynamicExam, SubjectKey, PlannerData, StudyDoc } from "@/lib/planner/types"
+import type { ArchivedExam, CustomExam, DynamicExam, PlannerData, StudyDoc } from "@/lib/planner/types"
 import type { TabId } from "./tabs-nav"
+
+const EXAM_COLORS = [
+  { bg: "#FFF1F2", border: "#FDA4AF", text: "#BE123C", dot: "#F43F5E", soft: "#FFFAFB" },
+  { bg: "#EEF2FF", border: "#A5B4FC", text: "#3730A3", dot: "#6366F1", soft: "#F8FAFE" },
+  { bg: "#FFFBEB", border: "#FCD34D", text: "#92400E", dot: "#F59E0B", soft: "#FFFCF4" },
+  { bg: "#ECFDF5", border: "#6EE7B7", text: "#065F46", dot: "#10B981", soft: "#F7FCF9" },
+]
+
+function toCustomExam(exam: DynamicExam, colorIndex: number): CustomExam {
+  return {
+    ...exam,
+    short: exam.name.slice(0, 12),
+    // invariant: solo esami "active" arrivano qui, examDate è sempre valorizzato
+    examDate: exam.examDate as string,
+    examISO: exam.examDate as string,
+    examTime: "-",
+    examType: exam.examType ?? "Scritto",
+    color: EXAM_COLORS[colorIndex % EXAM_COLORS.length],
+    chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [],
+  }
+}
 
 interface Props {
   data: PlannerData
-  toggleDaily: (day: string, ti: number) => void
-  toggleCatchupDone: (id: string) => void
-  attachDoc: (key: string, doc: StudyDoc) => void
-  removeDoc: (key: string) => void
-  addCustomExam: (exam: Omit<DynamicExam, "id" | "createdAt" | "status">) => void | Promise<void>
-  updateExam: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>) => void | Promise<void>
+  addCustomExam: (exam: Omit<DynamicExam, "id" | "createdAt">) => void | Promise<void>
+  updateExam: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu" | "status">>) => void | Promise<void>
   archiveExam: (id: string) => void
   removeExam: (id: string) => void
   restoreExam: (id: string) => void
@@ -46,18 +58,12 @@ interface Props {
   streak: number
   todayFocusMin: number
   todayFocusCount: number
-  skippedCount: number
-  onOpenCatchup: () => void
   onNavigate: (t: TabId) => void
   onShowToast?: (msg: string, tone?: "success" | "warn" | "info" | "default") => void
 }
 
 export function TodayTab({
   data,
-  toggleDaily,
-  toggleCatchupDone,
-  attachDoc,
-  removeDoc,
   addCustomExam,
   updateExam,
   archiveExam,
@@ -68,19 +74,14 @@ export function TodayTab({
   streak,
   todayFocusMin,
   todayFocusCount,
-  skippedCount,
-  onOpenCatchup,
   onNavigate,
   onShowToast,
 }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [editingExam, setEditingExam] = useState<CustomExam | null>(null)
-  const [deletingExam, setDeletingExam] = useState<CustomExam | null>(null)
+  const [deletingExam, setDeletingExam] = useState<DynamicExam | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
-  const { refresh: refreshDynamicExams } = useExams()
-  const todayKey = getTodayStr()
-  const items = getDayItems(todayKey, data)
-  const customExams = data.customExams ?? []
+  const { activeExams, refresh: refreshDynamicExams } = useExams()
   const archivedExams = data.archivedExams ?? []
   const todayLabel = new Date().toLocaleDateString("it-IT", {
     weekday: "long",
@@ -88,14 +89,15 @@ export function TodayTab({
     month: "long",
   })
   const displayTodayLabel = todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)
-  const studyDays = Object.keys(DAILY).filter((d) => (DAILY[d]?.sessions?.length ?? 0) > 0).sort()
-  const currentDayIndex = studyDays.indexOf(todayKey)
-  const currentDayNumber = currentDayIndex >= 0 ? currentDayIndex + 1 : 1
-  const totalStudyDays = studyDays.length
-  const upcomingBooking = BOOKINGS.find((b) => {
-    const d = daysUntil(b.date)
-    return d !== null && d >= 0
-  })
+  const studyProgress = useMemo(() => {
+    const today = new Date()
+    const dayMs = 86_400_000
+    return activeExams.map((exam) => {
+      const start = new Date(`${exam.startDate}T00:00:00`)
+      const elapsedDays = Math.max(0, Math.floor((today.getTime() - start.getTime()) / dayMs) + 1)
+      return { exam, currentDay: Math.min(elapsedDays, exam.studyPlan.totalDaysAvailable), totalDays: exam.studyPlan.totalDaysAvailable }
+    })
+  }, [activeExams])
 
   const confirmDeleteExam = async () => {
     if (!deletingExam) return
@@ -112,7 +114,7 @@ export function TodayTab({
     }
   }
 
-  const handleArchiveExam = async (exam: CustomExam) => {
+  const handleArchiveExam = async (exam: DynamicExam) => {
     try {
       await archiveExam(exam.id)
       await refreshDynamicExams().catch(() => {})
@@ -144,8 +146,6 @@ export function TodayTab({
       </motion.button>
       <PullToRefresh onRefresh={refreshDynamicExams}>
       <div className="space-y-5">
-      <SkippedBanner count={skippedCount} onOpen={onOpenCatchup} />
-
       {/* Greeting card */}
       <motion.div
         initial={{ opacity: 0, y: 6 }}
@@ -154,13 +154,15 @@ export function TodayTab({
         className="card-quiet p-4"
       >
         <div className="text-section-header text-stone-500">
-          {displayTodayLabel} · Giorno {currentDayNumber} di {totalStudyDays}
+          {displayTodayLabel}
         </div>
         <h2 className="text-page-title mt-1.5 text-stone-900">
           Buono studio
         </h2>
         <div className="mt-0.5 text-[12px] text-stone-500">
-          Fase 1 — Studio di base · 5 materie · 5–6 ore
+          {studyProgress.length > 0
+            ? studyProgress.map(({ exam, currentDay, totalDays }) => `${exam.name}: giorno ${currentDay} di ${totalDays}`).join(" · ")
+            : "Aggiungi un esame per creare il piano di studio"}
         </div>
         {todayFocusMin > 0 && (
           <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900">
@@ -214,68 +216,32 @@ export function TodayTab({
           Giorni agli esami
         </h3>
         <div className="grid grid-cols-2 gap-2.5">
-          {(Object.entries(SUBJECTS) as [SubjectKey, (typeof SUBJECTS)[SubjectKey]][]).map(([k, s], i) => {
-            const d = daysUntil(s.examISO)
-            const urgent = d !== null && d <= 7
-            return (
-              <motion.div
-                key={k}
-                initial={{ opacity: 0, y: 8, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={staggerSpring(i)}
-                className="relative overflow-hidden rounded-[20px] border border-[var(--border-subtle)] p-3.5 shadow-sm"
-                style={{ background: `color-mix(in oklch, ${C[k].dot} 7%, var(--surface))` }}
-              >
-                <div
-                  className="absolute left-0 top-0 h-full w-[3px]"
-                  style={{ background: C[k].dot }}
-                  aria-hidden
-                />
-                <div
-                  className="flex items-center gap-1.5 text-[10px] font-medium tracking-tight"
-                  style={{ color: C[k].text }}
-                >
-                  <SubjectIcon sub={k} size={11} strokeWidth={1.75} />
-                  <span className="truncate">{s.short}</span>
-                </div>
-                <div
-                  className={`mt-1 text-[34px] font-semibold tabular-nums leading-none tracking-tight ${
-                    urgent ? "text-rose-600" : "text-stone-900 dark:text-white"
-                  }`}
-                >
-                  {d ?? "—"}
-                </div>
-                <div className="mt-1 text-[10.5px] text-stone-500">
-                  {d !== null ? `giorni · ${s.examDate}` : s.examDate}
-                </div>
-              </motion.div>
-            )
-          })}
-
-          {customExams.map((exam, i) => {
-            const d = daysUntil(exam.examISO)
+          {activeExams.map((exam, i) => {
+            const customExam = toCustomExam(exam, i)
+            // invariant: activeExams ha sempre examDate valorizzato
+            const d = daysUntil(exam.examDate as string)
             const urgent = d !== null && d <= 7
             return (
               <motion.div
                 key={exam.id}
                 initial={{ opacity: 0, y: 8, scale: 0.97 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={staggerSpring(Object.keys(SUBJECTS).length + i)}
+                transition={staggerSpring(i)}
               >
                 <SwipeToDelete onDelete={() => setDeletingExam(exam)} ariaLabel={`Elimina ${exam.name}`}>
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => setEditingExam(exam)}
+                    onClick={() => setEditingExam(customExam)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") setEditingExam(exam)
+                      if (e.key === "Enter" || e.key === " ") setEditingExam(customExam)
                     }}
                     className="relative border border-[var(--border-subtle)] p-3.5 text-left shadow-sm"
-                    style={{ background: `color-mix(in oklch, ${exam.color.dot} 7%, var(--surface))` }}
+                    style={{ background: `color-mix(in oklch, ${customExam.color.dot} 7%, var(--surface))` }}
                   >
                     <div
                       className="absolute left-0 top-0 h-full w-[3px]"
-                      style={{ background: exam.color.dot }}
+                      style={{ background: customExam.color.dot }}
                       aria-hidden
                     />
                     <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
@@ -305,11 +271,11 @@ export function TodayTab({
                       </button>
                     </div>
                     <div className="flex items-center justify-between gap-3 pr-14">
-                      <div className="text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: exam.color.text }}>
-                        {exam.short || exam.name}
+                      <div className="text-[10px] font-medium uppercase tracking-[0.14em]" style={{ color: customExam.color.text }}>
+                        {customExam.short || exam.name}
                       </div>
                       <span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-stone-600">
-                        {exam.examType}
+                        {exam.examType ?? "Scritto"}
                       </span>
                     </div>
                     <div
@@ -320,7 +286,6 @@ export function TodayTab({
                       {d ?? "—"}
                     </div>
                     <div className="mt-1 text-[10.5px] text-stone-500">{d !== null ? `giorni · ${exam.examDate}` : exam.examDate}</div>
-                    <div className="mt-0.5 text-[10.5px] text-stone-500">{exam.examTime}</div>
                     {exam.studyPlan?.planStatus === "too-late" && (
                       <div className="mt-2 text-[11px] font-medium text-rose-600">
                         Esame troppo vicino: ti mostriamo solo cosa rivedere subito.
@@ -377,86 +342,7 @@ export function TodayTab({
       {/* Piano di studio degli esami per oggi */}
       <TodayStudyPlan />
 
-      {/* Today's program */}
-      <section>
-        <h3 className="text-section-header mb-2 px-0.5 text-stone-500">
-          Programma di oggi
-        </h3>
-        <div className="space-y-1.5">
-          {items.map((task, i) => {
-            const done = task.done
-            const isCatchup = task.kind === "catchup"
-            const docKey = isCatchup ? task.catchupId! : `${todayKey}_${task.plannedIdx!}`
-            return (
-              <motion.div
-                key={isCatchup ? `c_${task.catchupId}` : `p_${task.plannedIdx}`}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={staggerSpring(i, 0.05)}
-                className="card-quiet card-quiet-hover relative flex w-full items-start gap-3 overflow-hidden p-3"
-              >
-                <div
-                  className="absolute left-0 top-0 h-full w-[3px]"
-                  style={{ background: C[task.sub].dot }}
-                  aria-hidden
-                />
-                <button
-                  onClick={() => {
-                    if (isCatchup && task.catchupId) toggleCatchupDone(task.catchupId)
-                    else if (task.plannedIdx !== undefined) toggleDaily(todayKey, task.plannedIdx)
-                  }}
-                  className="flex items-start gap-3 text-left flex-1 min-w-0"
-                >
-                  <span
-                    className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
-                      done
-                        ? "bg-emerald-500"
-                        : "border-[1.5px] border-stone-300 bg-white"
-                    }`}
-                    aria-hidden
-                  >
-                    {done && <Check size={12} className="text-white" strokeWidth={3} />}
-                  </span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium">
-                      <span
-                        className="flex items-center gap-1"
-                        style={{ color: C[task.sub].text }}
-                      >
-                        <SubjectIcon sub={task.sub} size={11} strokeWidth={1.75} />
-                        {SUBJECTS[task.sub].short}
-                      </span>
-                      <span className="text-stone-400">·</span>
-                      <span className="text-stone-500">{task.dur}</span>
-                      {isCatchup && (
-                        <span className="ml-1 inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-amber-800">
-                          <RotateCw size={8} strokeWidth={2.5} />
-                          Recupero
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={`mt-1 block text-[13px] leading-snug ${
-                        done ? "text-stone-400 line-through" : "text-stone-800"
-                      }`}
-                    >
-                      {task.topic}
-                    </span>
-                  </span>
-                </button>
-                <StudyDocViewer
-                  sessionKey={docKey}
-                  sub={task.sub}
-                  doc={data.docs?.[docKey]}
-                  onAttach={attachDoc}
-                  onRemove={removeDoc}
-                />
-              </motion.div>
-            )
-          })}
-        </div>
-      </section>
+      {/* TODO: gli allegati StudyDocViewer delle sessioni legacy vivevano qui; migrarli al piano dinamico. */}
 
       {/* Primary actions */}
       <div className="grid grid-cols-2 gap-2">
@@ -483,24 +369,6 @@ export function TodayTab({
         </motion.button>
       </div>
 
-      {/* Next booking deadline — only when approaching */}
-      {upcomingBooking && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-3"
-        >
-          <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-amber-800">
-            <CalendarClock size={11} strokeWidth={2} />
-            Prossima scadenza
-          </div>
-          <div className="mt-1 text-[12.5px] text-stone-800">
-            <span className="font-semibold tabular-nums text-amber-900">{daysUntil(upcomingBooking.date)} giorni</span>
-            <span className="text-stone-600"> · {upcomingBooking.label}</span>
-          </div>
-        </motion.div>
-      )}
       </div>
       </PullToRefresh>
 
