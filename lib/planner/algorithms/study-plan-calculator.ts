@@ -68,6 +68,13 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
   const planStatus: StudyPlan["planStatus"] =
     totalDaysAvailable <= 0 ? "too-late" : studyDayKeys.length === 0 ? "review-only" : "ready"
 
+  // Ore/giorno: tetto fisso 2h per materia, non derogabile; null CFU = fallback comportamento precedente
+  const MAX_HOURS_PER_SUBJECT_PER_DAY = 2
+  const dailyHours =
+    exam.cfu === null
+      ? { min: 1, max: 1.5 }
+      : { min: 1, max: Math.min(MAX_HOURS_PER_SUBJECT_PER_DAY, exam.cfu === 12 ? 2 : 1.5) }
+
   const { pages, topics } = calculateMaterialQuantity(exam.material)
   const pagesPerDay = studyDayKeys.length > 0 && pages > 0 ? Math.ceil(pages / studyDayKeys.length) : undefined
   const topicsPerDay =
@@ -84,7 +91,7 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
     if (dayTopics?.length) topicCursor += dayTopics.length
     const generated = {
       ...(pagesForDay ? { pages: pagesForDay } : {}),
-      hours: { min: 1, max: 1.5 },
+      hours: dailyHours,
       ...(dayTopics?.length ? { topics: dayTopics } : {}),
       completed: false,
     }
@@ -93,7 +100,7 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
 
   for (const dateKey of reviewDayKeys) {
     const generated = {
-      hours: { min: 1, max: 1.5 },
+      hours: dailyHours,
       topics: ["Ripasso finale"],
       completed: false,
       isReview: true,
@@ -104,7 +111,7 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
   return {
     totalDaysAvailable,
     studyDaysPerWeek: 5,
-    hoursPerDay: { min: 1, max: 1.5 },
+    hoursPerDay: dailyHours,
     reviewDaysBefore,
     dailySchedule,
     ...(pagesPerDay ? { totalPagesPerDay: pagesPerDay } : {}),

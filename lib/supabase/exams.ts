@@ -1,6 +1,6 @@
 import { supabase } from "./client"
 import { ensureAnonymousSession } from "./session"
-import type { ArchivedExam, CustomExam, DynamicExam, ExamDailyProgress } from "@/lib/planner/types"
+import type { ArchivedExam, CustomExam, DynamicExam, ExamDailyProgress, StudyPlan } from "@/lib/planner/types"
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 import { calculateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
 
@@ -31,26 +31,38 @@ function toCustomExam(exam: DynamicExam, index: number): CustomExam {
     { bg: "#ECFDF5", border: "#6EE7B7", text: "#065F46", dot: "#10B981", soft: "#F7FCF9" },
   ]
   const formattedDate = parseISODate(exam.examDate).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })
-  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examDate: formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1), examTime: "—", examType: "Scritto", examISO: exam.examDate, color: colors[index % colors.length], material: exam.material, chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [], createdAt: exam.createdAt, startDate: exam.startDate, studyPlan: exam.studyPlan, status: exam.status }
+  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examDate: formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1), examTime: "—", examType: exam.examType ?? "Scritto", examISO: exam.examDate, color: colors[index % colors.length], material: exam.material, chapters: exam.material.notes?.split("\n").filter(Boolean) ?? [], createdAt: exam.createdAt, startDate: exam.startDate, studyPlan: exam.studyPlan, status: exam.status }
 }
 
 function toArchivedExam(exam: DynamicExam): ArchivedExam {
   const completed = Object.values(exam.studyPlan.dailySchedule).filter((day) => day.completed).length
-  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examISO: exam.examDate, examType: "Scritto", color: { dot: "#64748B", text: "#475569", bg: "#F8FAFC" }, completedAt: exam.createdAt, topicsTotal: Object.keys(exam.studyPlan.dailySchedule).length, topicsDone: completed, completionPct: 0 }
+  return { id: exam.id, name: exam.name, short: exam.name.slice(0, 12), examISO: exam.examDate, examType: exam.examType ?? "Scritto", color: { dot: "#64748B", text: "#475569", bg: "#F8FAFC" }, completedAt: exam.createdAt, topicsTotal: Object.keys(exam.studyPlan.dailySchedule).length, topicsDone: completed, completionPct: 0 }
 }
 
 export async function getAllExams(): Promise<{ customExams: CustomExam[]; archivedExams: ArchivedExam[]; dynamicExams: DynamicExam[] }> {
   await getUserId()
   const { data, error } = await supabase.from("dynamic_exams").select("*").order("exam_date", { ascending: true })
   if (error) throw error
-  const dynamicExams: DynamicExam[] = (data ?? []).map((row) => ({ id: row.id, name: row.name, startDate: row.start_date, examDate: row.exam_date, material: row.material, studyPlan: row.study_plan, createdAt: new Date(row.created_at).getTime(), status: row.status }))
+  const dynamicExams: DynamicExam[] = (data ?? []).map((row) => ({ id: row.id, name: row.name, startDate: row.start_date, examDate: row.exam_date, examType: row.type ?? null, cfu: row.cfu ?? null, material: row.material, studyPlan: row.study_plan, createdAt: new Date(row.created_at).getTime(), status: row.status }))
   return { dynamicExams, customExams: dynamicExams.filter((exam) => exam.status === "active").map(toCustomExam), archivedExams: dynamicExams.filter((exam) => exam.status !== "active").map(toArchivedExam) }
 }
 
+// Piano iniziale valido: study_plan è NOT NULL, quindi non passiamo mai null/undefined
+// nemmeno se il piano non è stato ancora calcolato al momento dell'insert.
+// La forma rispecchia StudyPlan (dailySchedule vuoto = nessun giorno pianificato).
+const EMPTY_STUDY_PLAN: StudyPlan = { totalDaysAvailable: 0, studyDaysPerWeek: 5, hoursPerDay: { min: 1, max: 1.5 }, reviewDaysBefore: 4, dailySchedule: {} }
+
 export async function addCustomExam(exam: Omit<DynamicExam, "id" | "createdAt" | "status">) {
   const userId = await getUserId()
-  const { error } = await supabase.from("dynamic_exams").insert({ user_id: userId, name: exam.name, start_date: exam.startDate, exam_date: exam.examDate, material: exam.material, study_plan: exam.studyPlan, status: "active" })
-  if (error) throw error
+  // created_at è bigint NOT NULL senza default: va inviato esplicitamente come epoch ms
+  // (coerente con la lettura new Date(row.created_at).getTime() in getAllExams)
+  const { error } = await supabase.from("dynamic_exams").insert({ user_id: userId, name: exam.name, start_date: exam.startDate, exam_date: exam.examDate, type: exam.examType ?? null, cfu: exam.cfu ?? null, material: exam.material, study_plan: exam.studyPlan ?? EMPTY_STUDY_PLAN, status: "active", created_at: Date.now() })
+  if (error) {
+    // Log diagnostico prima del messaggio generico mostrato all'utente: rivela la causa esatta
+    // (es. 23502 NOT NULL violation, 42501 RLS, 22P02 tipo bigint) se l'insert fallisce ancora.
+    console.error("[addCustomExam] insert su dynamic_exams fallita:", { message: error.message, code: error.code, details: error.details, hint: error.hint })
+    throw error
+  }
   return getAllExams()
 }
 
@@ -78,14 +90,14 @@ export async function restoreExam(id: string) {
 // Aggiorna nome/data/materiale di un esame e ricalcola il piano preservando i giorni già completati
 export async function updateExamMaterial(
   exam: DynamicExam,
-  updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material">>,
+  updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>,
 ) {
   await getUserId()
   const merged: DynamicExam = { ...exam, ...updates }
   const studyPlan = calculateStudyPlan(merged, exam.studyPlan)
   const { error } = await supabase
     .from("dynamic_exams")
-    .update({ name: merged.name, exam_date: merged.examDate, material: merged.material, study_plan: studyPlan })
+    .update({ name: merged.name, exam_date: merged.examDate, type: merged.examType ?? null, cfu: merged.cfu ?? null, material: merged.material, study_plan: studyPlan })
     .eq("id", exam.id)
   if (error) throw error
   return getAllExams()

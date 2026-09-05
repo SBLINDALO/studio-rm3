@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { TrendingUp, GraduationCap, AlertTriangle, Settings } from "lucide-react"
-import { SUBJECTS, C } from "@/lib/planner/data"
-import { SubjectIcon } from "./subject-icon"
 import type { SubjectKey } from "@/lib/planner/types"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useExams } from "@/components/exams/exams-context"
-import { countdownLabel, daysRemaining } from "@/components/exams/exam-utils"
+import { countdownLabel, daysRemaining, computeExamProgress } from "@/components/exams/exam-utils"
+
+// Stessa palette a rotazione usata per le card esame (components/exams/exam-utils.ts)
+const EXAM_DOT_COLORS = ["#F43F5E", "#6366F1", "#F59E0B", "#10B981"]
 
 const SUBJECT_COLORS: Record<SubjectKey, string> = {
   psico: "#E11D48",
@@ -45,19 +46,22 @@ export function Header({
   const [celebrate, setCelebrate] = useState<number | null>(null)
   const [lastThreshold, setLastThreshold] = useState(0)
 
-  const subjectProgress = useMemo(
+  // Badge/pannello materie: ora derivati dagli esami dinamici dell'utente (dynamic_exams),
+  // non più dalle 5 materie hardcoded di lib/planner/data.
+  const examProgress = useMemo(
     () =>
-      (Object.keys(SUBJECTS) as SubjectKey[]).map((key) => ({
-        key,
-        name: SUBJECTS[key].short,
-        ...getProgress(key),
+      activeExams.map((exam, index) => ({
+        key: exam.id,
+        name: exam.name,
+        dot: EXAM_DOT_COLORS[index % EXAM_DOT_COLORS.length],
+        pct: computeExamProgress(exam).completionPct,
       })),
-    [getProgress],
+    [activeExams],
   )
 
-  const dominantSubject = useMemo(
-    () => subjectProgress.reduce((best, item) => (item.pct > best.pct ? item : best), subjectProgress[0]),
-    [subjectProgress],
+  const dominantExam = useMemo(
+    () => examProgress.reduce((best, item) => (item.pct > best.pct ? item : best), examProgress[0]),
+    [examProgress],
   )
 
   const motivator = useMemo(() => {
@@ -108,7 +112,7 @@ export function Header({
     return undefined
   }, [globalPct, lastThreshold])
 
-  const glowColor = SUBJECT_COLORS[dominantSubject?.key ?? "psico"]
+  const glowColor = dominantExam?.dot ?? EXAM_DOT_COLORS[0]
   const nextExam = useMemo(
     () => activeExams.filter((exam) => daysRemaining(exam) >= 0).sort((a, b) => daysRemaining(a) - daysRemaining(b))[0],
     [activeExams],
@@ -278,13 +282,13 @@ export function Header({
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.25 }}
             >
-              {subjectProgress.map((item, index) => (
+              {examProgress.map((item, index) => (
                 <div key={item.key} className="rounded-[16px] bg-white/10 p-3">
                   <div className="mb-2 flex items-center justify-between text-[12px] text-stone-100">
                     <span className="flex items-center gap-2">
                       <span
                         className="inline-flex h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: SUBJECT_COLORS[item.key] }}
+                        style={{ backgroundColor: item.dot }}
                       />
                       <span>{item.name}</span>
                     </span>
@@ -293,7 +297,7 @@ export function Header({
                   <div className="h-2.5 overflow-hidden rounded-full bg-stone-900/10">
                     <motion.div
                       className="h-full rounded-full"
-                      style={{ backgroundColor: SUBJECT_COLORS[item.key] }}
+                      style={{ backgroundColor: item.dot }}
                       initial={{ width: 0 }}
                       animate={{ width: `${item.pct}%` }}
                       transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
@@ -308,28 +312,25 @@ export function Header({
 
       {/* Subject chips */}
       <div className="mt-2.5 flex flex-wrap gap-1.5">
-        {(Object.entries(SUBJECTS) as [SubjectKey, (typeof SUBJECTS)[SubjectKey]][]).map(([k, s], i) => {
-          const { pct } = getProgress(k)
-          return (
-            <motion.div
-              key={k}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + i * 0.04 }}
-              className="pill border border-white/15 bg-white/10 text-white"
-              style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}
-            >
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ background: C[k].dot }}
-                aria-hidden
-              />
-              <SubjectIcon sub={k} size={11} strokeWidth={1.75} />
-              <span className="text-white">{s.short}</span>
-              <span className="tabular-nums text-stone-200/80">{pct}%</span>
-            </motion.div>
-          )
-        })}
+        {examProgress.map((item, i) => (
+          <motion.div
+            key={item.key}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 + i * 0.04 }}
+            className="pill border border-white/15 bg-white/10 text-white"
+            style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: item.dot }}
+              aria-hidden
+            />
+            <GraduationCap size={11} strokeWidth={1.75} />
+            <span className="text-white">{item.name}</span>
+            <span className="tabular-nums text-stone-200/80">{item.pct}%</span>
+          </motion.div>
+        ))}
       </div>
     </motion.header>
   )

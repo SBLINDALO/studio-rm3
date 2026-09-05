@@ -22,7 +22,7 @@ interface ExamsContextValue {
   archiveExam: (id: string) => Promise<void>
   removeExam: (id: string) => Promise<void>
   restoreExam: (id: string) => Promise<void>
-  updateExamMaterial: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material">>) => Promise<void>
+  updateExamMaterial: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>) => Promise<void>
   setDayCompletion: (exam: DynamicExam, date: string, completed: boolean) => Promise<void>
 }
 
@@ -117,7 +117,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateExamMaterial = useCallback(
-    async (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material">>) => {
+    async (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>) => {
       const { dynamicExams } = await updateExamMaterialInSupabase(exam, updates)
       setExams(dynamicExams)
     },

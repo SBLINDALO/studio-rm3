@@ -105,11 +105,15 @@ CREATE TABLE IF NOT EXISTS dynamic_exams (
   name TEXT NOT NULL,
   start_date DATE NOT NULL,
   exam_date DATE NOT NULL,
+  type TEXT CHECK (type IN ('Scritto', 'Orale')),
   material JSONB NOT NULL DEFAULT '{}'::JSONB,
   study_plan JSONB NOT NULL DEFAULT '{}'::JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived'))
 );
+
+-- Idempotente per i database dove dynamic_exams esisteva già senza la colonna type
+ALTER TABLE dynamic_exams ADD COLUMN IF NOT EXISTS type TEXT CHECK (type IN ('Scritto', 'Orale'));
 
 ALTER TABLE dynamic_exams ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own dynamic exams" ON dynamic_exams;

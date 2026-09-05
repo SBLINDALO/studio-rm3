@@ -59,6 +59,8 @@ export interface DynamicExam {
   name: string
   startDate: string
   examDate: string
+  examType: "Scritto" | "Orale" | null
+  cfu: 6 | 12 | null
   material: {
     type: "pages" | "pdf" | "notes" | "mixed"
     totalPages?: number
@@ -68,6 +70,20 @@ export interface DynamicExam {
   }
   studyPlan: StudyPlan
   createdAt: number
+  status: "active" | "completed" | "archived"
+}
+
+// Riflette 1:1 le colonne della tabella dynamic_exams (snake_case)
+export interface DynamicExamRow {
+  id: string
+  user_id: string
+  name: string
+  start_date: string
+  exam_date: string
+  type: "Scritto" | "Orale" | null
+  material: DynamicExam["material"]
+  study_plan: StudyPlan
+  created_at: number
   status: "active" | "completed" | "archived"
 }
 

@@ -37,7 +37,7 @@ interface Props {
   attachDoc: (key: string, doc: StudyDoc) => void
   removeDoc: (key: string) => void
   addCustomExam: (exam: Omit<DynamicExam, "id" | "createdAt" | "status">) => void | Promise<void>
-  updateExam: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material">>) => void | Promise<void>
+  updateExam: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "material" | "examType" | "cfu">>) => void | Promise<void>
   archiveExam: (id: string) => void
   removeExam: (id: string) => void
   restoreExam: (id: string) => void

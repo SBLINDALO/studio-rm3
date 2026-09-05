@@ -19,10 +19,22 @@ const materialTypes: Array<{ value: DynamicExam["material"]["type"]; label: stri
   { value: "mixed", label: "Mix" },
 ]
 
+const examTypes: Array<{ value: NonNullable<DynamicExam["examType"]>; label: string }> = [
+  { value: "Scritto", label: "Scritto" },
+  { value: "Orale", label: "Orale" },
+]
+
+const cfuOptions: Array<{ value: NonNullable<DynamicExam["cfu"]>; label: string }> = [
+  { value: 6, label: "6" },
+  { value: 12, label: "12" },
+]
+
 export function EditExamModal({ exam, onClose, onSave }: Props) {
   const [name, setName] = useState("")
   const [date, setDate] = useState("")
   const [type, setType] = useState<DynamicExam["material"]["type"]>("pages")
+  const [examType, setExamType] = useState<NonNullable<DynamicExam["examType"]>>("Scritto")
+  const [cfu, setCfu] = useState<NonNullable<DynamicExam["cfu"]>>(6)
   const [pages, setPages] = useState("")
   const [notes, setNotes] = useState("")
   const [error, setError] = useState("")
@@ -33,6 +45,8 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
     setName(exam.name)
     setDate(exam.examISO)
     setType(exam.material?.type ?? "pages")
+    setExamType(exam.examType === "Orale" ? "Orale" : "Scritto")
+    setCfu(exam.cfu === 12 ? 12 : 6)
     setPages(exam.material?.totalPages ? String(exam.material.totalPages) : "")
     setNotes(exam.material?.notes ?? "")
     setError("")
@@ -64,6 +78,8 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
       name: exam.name,
       startDate: exam.startDate,
       examDate: exam.examISO,
+      examType: exam.examType === "Orale" ? "Orale" : "Scritto",
+      cfu: exam.cfu === 12 ? 12 : 6,
       material: exam.material ?? { type: "notes" },
       studyPlan: exam.studyPlan,
       createdAt: exam.createdAt,
@@ -72,7 +88,7 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
 
     setSaving(true)
     try {
-      await onSave(dynamicExam, { name: name.trim(), examDate: date, material })
+      await onSave(dynamicExam, { name: name.trim(), examDate: date, material, examType, cfu })
       close()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Impossibile salvare le modifiche")
@@ -99,6 +115,8 @@ export function EditExamModal({ exam, onClose, onSave }: Props) {
       <div className="space-y-3">
         <label className="block text-xs font-medium text-stone-600">Nome<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Es. Storia dell'arte" /></label>
         <label className="block text-xs font-medium text-stone-600">Data esame<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" /></label>
+        <div><p className="mb-1 text-xs font-medium text-stone-600">Tipo esame</p><div className="grid grid-cols-2 gap-2">{examTypes.map((item) => <button type="button" key={item.value} onClick={() => setExamType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${examType === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
+        <div><p className="mb-1 text-xs font-medium text-stone-600">CFU</p><div className="grid grid-cols-2 gap-2">{cfuOptions.map((item) => <button type="button" key={item.value} onClick={() => setCfu(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${cfu === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         <div><p className="mb-1 text-xs font-medium text-stone-600">Materiale</p><div className="grid grid-cols-4 gap-2">{materialTypes.map((item) => <button type="button" key={item.value} onClick={() => setType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${type === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         {(type === "pages" || type === "mixed") && <label className="block text-xs font-medium text-stone-600">Pagine totali<input type="number" min="1" value={pages} onChange={(event) => setPages(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Es. 240" /></label>}
         {(type === "notes" || type === "mixed") && <label className="block text-xs font-medium text-stone-600">Note<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 min-h-20 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Argomenti o capitoli da studiare" /></label>}
