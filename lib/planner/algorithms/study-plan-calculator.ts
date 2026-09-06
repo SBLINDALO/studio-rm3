@@ -127,7 +127,7 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
 
   // giorni/settimana rappresentativi dello schedule reale a partire dall'inizio del piano,
   // solo a scopo informativo (non usato per la distribuzione del carico)
-  const studyDaysPerWeek = getAvailabilityForRange(start, addDays(start, 6)).filter((day) => day.isStudyDay).length
+  const studyDaysPerWeek = availability.slice(0, 7).filter((day) => day.isStudyDay).length
 
   return {
     totalDaysAvailable,
