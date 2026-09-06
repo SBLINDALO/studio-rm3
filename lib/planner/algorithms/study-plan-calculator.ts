@@ -1,6 +1,7 @@
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
 import type { DynamicExam, StudyPlan } from "@/lib/planner/types"
 import { DEFAULT_CONFIG, type DailySession, type Exam, type StudyPlanConfig } from "../types-exam"
+import { getAvailabilityForRange } from "./schedule-integration"
 
 const DAY_MS = 86_400_000
 const REVIEW_DAYS_BEFORE = 4
@@ -14,11 +15,6 @@ function addDays(date: Date, amount: number): Date {
   const next = new Date(date)
   next.setDate(next.getDate() + amount)
   return next
-}
-
-function isWeekday(date: Date): boolean {
-  const day = date.getDay()
-  return day !== 0 && day !== 6
 }
 
 function preserveProgress(
@@ -65,14 +61,17 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
   const reviewDaysBefore = REVIEW_DAYS_BEFORE
   const reviewStart = addDays(examDate, -reviewDaysBefore)
 
-  // pattern fisso 5gg/settimana: solo i giorni feriali entrano in agenda, weekend esclusi
+  // disponibilità reale (lezioni/autostudio/allenamenti) da weekly-schedule.ts al posto
+  // del pattern fisso 5gg/settimana: i giorni pieni di impegni sono esclusi, senza recupero
+  const availability = totalDaysAvailable > 0 ? getAvailabilityForRange(start, addDays(examDate, -1)) : []
+  const availabilityByKey = new Map(availability.map((day) => [formatISODate(day.date), day]))
+
   const studyDayKeys: string[] = []
   const reviewDayKeys: string[] = []
-  for (let offset = 0; offset < totalDaysAvailable; offset += 1) {
-    const date = addDays(start, offset)
-    if (!isWeekday(date)) continue
-    const dateKey = formatISODate(date)
-    if (date >= reviewStart) reviewDayKeys.push(dateKey)
+  for (const day of availability) {
+    if (!day.isStudyDay) continue
+    const dateKey = formatISODate(day.date)
+    if (day.date >= reviewStart) reviewDayKeys.push(dateKey)
     else studyDayKeys.push(dateKey)
   }
 
@@ -85,6 +84,13 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
     exam.cfu === null
       ? { min: 1, max: 1.5 }
       : { min: 1, max: Math.min(MAX_HOURS_PER_SUBJECT_PER_DAY, exam.cfu === 12 ? 2 : 1.5) }
+
+  // Capa il tetto della materia alle ore reali disponibili in quel giorno specifico
+  // (mai più di MAX_HOURS_PER_SUBJECT_PER_DAY, ma anche mai più di quanto lo schedule permetta)
+  function hoursForDay(dateKey: string): { min: number; max: number } {
+    const availableHours = availabilityByKey.get(dateKey)?.availableHours ?? dailyHours.max
+    return { min: Math.min(dailyHours.min, availableHours), max: Math.min(dailyHours.max, availableHours) }
+  }
 
   const { pages, topics } = calculateMaterialQuantity(exam.material)
   const pagesPerDay = studyDayKeys.length > 0 && pages > 0 ? Math.ceil(pages / studyDayKeys.length) : undefined
@@ -102,7 +108,7 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
     if (dayTopics?.length) topicCursor += dayTopics.length
     const generated = {
       ...(pagesForDay ? { pages: pagesForDay } : {}),
-      hours: dailyHours,
+      hours: hoursForDay(dateKey),
       ...(dayTopics?.length ? { topics: dayTopics } : {}),
       completed: false,
     }
@@ -111,7 +117,7 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
 
   for (const dateKey of reviewDayKeys) {
     const generated = {
-      hours: dailyHours,
+      hours: hoursForDay(dateKey),
       topics: ["Ripasso finale"],
       completed: false,
       isReview: true,
@@ -119,9 +125,13 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
     dailySchedule[dateKey] = preserveProgress(dateKey, generated, previousPlan)
   }
 
+  // giorni/settimana rappresentativi dello schedule reale a partire dall'inizio del piano,
+  // solo a scopo informativo (non usato per la distribuzione del carico)
+  const studyDaysPerWeek = availability.slice(0, 7).filter((day) => day.isStudyDay).length
+
   return {
     totalDaysAvailable,
-    studyDaysPerWeek: 5,
+    studyDaysPerWeek,
     hoursPerDay: dailyHours,
     reviewDaysBefore,
     dailySchedule,
