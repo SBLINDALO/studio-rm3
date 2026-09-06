@@ -5,6 +5,7 @@ export type TopicStatus = "done" | "review" | null
 export interface StudyPlan {
   planStatus?: "ready" | "review-only" | "too-late" | "no-date"
   totalDaysAvailable: number
+  /** Approssimazione basata sulla prima settimana del piano (schedule reale), non una media sull'intero piano. */
   studyDaysPerWeek: number
   hoursPerDay: { min: number; max: number }
   reviewDaysBefore: 4

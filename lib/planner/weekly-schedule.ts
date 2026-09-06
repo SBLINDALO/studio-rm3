@@ -1,3 +1,5 @@
+import { formatISODate } from "@/lib/planner/utils/dates"
+
 export type WeekDay = 0 | 1 | 2 | 3 | 4 | 5 | 6 // 0 = domenica, 1 = lunedì ... 6 = sabato
 
 export type CommitmentMode = "lezione_presenza" | "lezione_online" | "autostudio" | "allenamento" | "partita"
@@ -43,10 +45,7 @@ function toMinutes(hhmm: string): number {
 }
 
 function toDateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
+  return formatISODate(date)
 }
 
 interface Interval {
@@ -108,4 +107,9 @@ export function getAvailableStudyHours(date: Date, maxDailyHours = 4): number {
 
 export function isStudyDay(date: Date, minHours = 0.5): boolean {
   return getAvailableStudyHours(date) >= minHours
+}
+
+/** Variante interna che evita di ricalcolare le finestre di studio quando le ore sono già note. */
+export function isStudyDayFromHours(hours: number, minHours = 0.5): boolean {
+  return hours >= minHours
 }

@@ -1,4 +1,4 @@
-import { getAvailableStudyHours, isStudyDay } from "@/lib/planner/weekly-schedule"
+import { getAvailableStudyHours, isStudyDayFromHours } from "@/lib/planner/weekly-schedule"
 
 /**
  * Disponibilità di studio reale per un singolo giorno, calcolata a partire
@@ -20,10 +20,11 @@ export function getAvailabilityForRange(startDate: Date, endDate: Date, maxDaily
   const cursor = new Date(startDate)
   while (cursor <= endDate) {
     const date = new Date(cursor)
+    const availableHours = getAvailableStudyHours(date, maxDailyHours)
     days.push({
       date,
-      availableHours: getAvailableStudyHours(date, maxDailyHours),
-      isStudyDay: isStudyDay(date),
+      availableHours,
+      isStudyDay: isStudyDayFromHours(availableHours),
     })
     cursor.setDate(cursor.getDate() + 1)
   }
