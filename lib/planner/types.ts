@@ -5,7 +5,7 @@ export type TopicStatus = "done" | "review" | null
 export interface StudyPlan {
   planStatus?: "ready" | "review-only" | "too-late" | "no-date"
   totalDaysAvailable: number
-  studyDaysPerWeek: 5
+  studyDaysPerWeek: number
   hoursPerDay: { min: number; max: number }
   reviewDaysBefore: 4
   dailySchedule: Record<string, {
