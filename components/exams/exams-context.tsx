@@ -1,8 +1,10 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
-import type { DynamicExam } from "@/lib/planner/types"
+import type { DynamicExam, DynamicStudyPlan } from "@/lib/planner/types"
 import type { ExamDailyProgress } from "@/lib/planner/types"
+import { calculateDynamicStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
+import { getExamDailyProgress } from "@/lib/supabase/exams"
 import { supabase } from "@/lib/supabase/client"
 import {
   getAllExams,
@@ -27,6 +29,7 @@ interface ExamsContextValue {
   updateExamMaterial: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu" | "status">>) => Promise<void>
   setDayCompletion: (exam: DynamicExam, date: string, completed: boolean) => Promise<void>
   markDayAheadAsCompleted: (examId: string, date: string) => Promise<void>
+  dynamicPlan: DynamicStudyPlan
 }
 
 type PendingDailyProgress = Omit<ExamDailyProgress, "id" | "user_id" | "created_at">
@@ -39,6 +42,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
   const [exams, setExams] = useState<DynamicExam[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [dailyProgress, setDailyProgress] = useState<ExamDailyProgress[]>([])
 
   const refresh = useCallback(async () => {
     try {
@@ -184,6 +188,10 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
 
   const activeExams = useMemo(() => exams.filter((exam) => exam.status === "active"), [exams])
   const planningExams = useMemo(() => exams.filter((exam) => exam.status === "planning"), [exams])
+  const dynamicPlan = useMemo(
+    () => calculateDynamicStudyPlan(activeExams, dailyProgress, new Date().toISOString().slice(0, 10)),
+    [activeExams, dailyProgress],
+  )
 
   const value: ExamsContextValue = {
     exams,
@@ -198,6 +206,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
     updateExamMaterial,
     setDayCompletion,
     markDayAheadAsCompleted,
+    dynamicPlan,
   }
 
   return <ExamsContext.Provider value={value}>{children}</ExamsContext.Provider>
