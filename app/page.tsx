@@ -324,7 +324,7 @@ function PlannerPageContent() {
   if (!loaded) {
     return (
       <MotionConfig reducedMotion="user">
-        <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex min-h-dvh items-center justify-center bg-background">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
@@ -338,7 +338,7 @@ function PlannerPageContent() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="relative mx-auto min-h-screen max-w-[680px] overflow-x-hidden bg-background pb-24 antialiased">
+    <div className="relative mx-auto min-h-dvh w-full max-w-[680px] overflow-x-clip bg-background pb-[calc(6rem+env(safe-area-inset-bottom))] antialiased">
       <FocusView
         open={focusView}
         timerRemaining={timerRemaining}

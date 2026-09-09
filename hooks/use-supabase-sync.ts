@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { supabase, type UserProgress } from "@/lib/supabase/client"
+import { ensureAnonymousSession } from "@/lib/supabase/session"
 import type { SubjectKey, LoggedSession } from "@/lib/planner/types"
 
 type SyncStatus = "idle" | "syncing" | "error"
@@ -41,7 +42,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
 
         // Se non loggato, usa localStorage
         if (!user.user) {
@@ -88,7 +89,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
 
         if (!user.user) {
           saveTopicQuizToLocalStorage(subject, topicIndex, notesData)
@@ -128,7 +129,7 @@ export function useSupabaseSync() {
   const loadProgressFromSupabase = useCallback(
     async (): Promise<Record<string, UserProgress>> => {
       try {
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
 
         // Se non loggato, restituisci empty
         if (!user.user) return {}
@@ -167,7 +168,7 @@ export function useSupabaseSync() {
   const loadDailyFromSupabase = useCallback(
     async (): Promise<Record<string, boolean>> => {
       try {
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) return {}
 
         const { data, error } = await supabase
@@ -203,7 +204,7 @@ export function useSupabaseSync() {
   const loadNotesFromSupabase = useCallback(
     async (): Promise<Record<string, string>> => {
       try {
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) return {}
 
         const { data, error } = await supabase
@@ -238,7 +239,7 @@ export function useSupabaseSync() {
   const loadConfFromSupabase = useCallback(
     async (): Promise<Record<string, number>> => {
       try {
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) return {}
 
         const { data, error } = await supabase
@@ -273,7 +274,7 @@ export function useSupabaseSync() {
   const loadCheckFromSupabase = useCallback(
     async (): Promise<Record<string, number>> => {
       try {
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) return {}
 
         const { data, error } = await supabase
@@ -308,7 +309,7 @@ export function useSupabaseSync() {
   const loadSessionsFromSupabase = useCallback(
     async (): Promise<LoggedSession[]> => {
       try {
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) return []
 
         const { data, error } = await supabase
@@ -358,7 +359,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) {
           saveDailyToLocalStorage(dayStr, sessionIndex, isDone)
           setSyncStatus("idle")
@@ -404,7 +405,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) {
           saveNoteToLocalStorage(weekIdx, note)
           setSyncStatus("idle")
@@ -449,7 +450,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) {
           saveConfToLocalStorage(key, value)
           setSyncStatus("idle")
@@ -494,7 +495,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) {
           saveCheckToLocalStorage(key, value)
           setSyncStatus("idle")
@@ -539,7 +540,7 @@ export function useSupabaseSync() {
       try {
         setSyncStatus("syncing")
 
-        const { data: user } = await supabase.auth.getUser()
+        const user = await getSyncUser()
         if (!user.user) {
           saveSessionToLocalStorage(session)
           setSyncStatus("idle")
@@ -589,6 +590,14 @@ export function useSupabaseSync() {
     syncStatus,
     isOnline,
   }
+}
+
+async function getSyncUser() {
+  await ensureAnonymousSession()
+  const { data, error } = await supabase.auth.getUser()
+  if (error) throw error
+  if (!data.user) throw new Error("Supabase session unavailable after anonymous bootstrap")
+  return data
 }
 
 /**

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { generateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
 import type { DailySession, Exam } from "@/lib/planner/types-exam"
 import { supabase } from "@/lib/supabase/client"
+import { ensureAnonymousSession } from "@/lib/supabase/session"
 
 type ExamRow = {
   id: string
@@ -36,6 +37,7 @@ export function useExams() {
 
   const reload = useCallback(async () => {
     setLoading(true)
+    await ensureAnonymousSession()
     const { data: examRows } = await supabase.from("exams").select("*").order("date")
     const { data: sessionRows } = await supabase.from("daily_sessions").select("*")
     const typedExamRows = (examRows ?? []) as ExamRow[]
@@ -57,8 +59,9 @@ export function useExams() {
 
   const addExam = useCallback(
     async (exam: Omit<Exam, "id" | "createdAt">) => {
+      await ensureAnonymousSession()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) throw new Error("Sessione Supabase non disponibile")
       await supabase.from("exams").insert({
         user_id: user.id,
         name: exam.name,
@@ -86,8 +89,9 @@ export function useExams() {
 
   const setManualOverride = useCallback(
     async (examId: string, date: string, hours: number) => {
+      await ensureAnonymousSession()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) throw new Error("Sessione Supabase non disponibile")
       await supabase.from("daily_sessions").upsert(
         { user_id: user.id, exam_id: examId, date, hours, is_auto: false, completed: false },
         { onConflict: "user_id,exam_id,date" },
@@ -99,8 +103,9 @@ export function useExams() {
 
   const markAheadForTomorrow = useCallback(
     async (examId: string, date: string) => {
+      await ensureAnonymousSession()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) throw new Error("Sessione Supabase non disponibile")
       const tomorrow = new Date(date)
       tomorrow.setDate(tomorrow.getDate() + 1)
       await supabase.from("daily_sessions").upsert(
