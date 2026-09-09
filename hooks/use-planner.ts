@@ -7,6 +7,8 @@ import { getTodayStr } from "@/lib/planner/helpers"
 import { useSupabaseSync } from "./use-supabase-sync"
 import { getAllExams, addCustomExam as addExamToSupabase, removeExam as removeExamFromSupabase, archiveExam as archiveExamToSupabase, restoreExam as restoreExamFromSupabase, updateExamMaterial as updateExamInSupabase } from "@/lib/supabase/exams"
 import { getStudyProgress, updateChapterProgress as updateChapterProgressInSupabase, getDailyStats, getStreak } from "@/lib/supabase/study-progress"
+import { supabase } from "@/lib/supabase/client"
+import { ensureAnonymousSession } from "@/lib/supabase/session"
 import type { StudyProgress } from "@/lib/supabase/client"
 
 const STORAGE_KEY = "planner5v3"
@@ -37,6 +39,10 @@ export function usePlanner() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        await ensureAnonymousSession()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Sessione Supabase non disponibile")
+        const userId = user.id
         const raw = localStorage.getItem(STORAGE_KEY)
         let parsed = initialData
         if (raw) {
@@ -102,7 +108,6 @@ export function usePlanner() {
         parsed.sessions = [...parsed.sessions, ...newSessions]
 
         // Carica esami da Supabase
-        const userId = "test-user"
         try {
           const { customExams, archivedExams, dynamicExams } = await getAllExams()
           parsed.customExams = customExams

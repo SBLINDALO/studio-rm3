@@ -241,9 +241,20 @@
 
   body {
     @apply bg-background text-foreground;
+    min-width: 0;
+    min-height: 100%;
     font-family: var(--font-sans);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+
+  html {
+    min-width: 0;
+    min-height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
   }
 
   /* iOS safe areas */
