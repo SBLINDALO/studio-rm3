@@ -7,7 +7,9 @@ import { WEEKS, DAILY, C, SUBJECTS, PHASE_COLOR } from "@/lib/planner/data"
 import { getTodayStr } from "@/lib/planner/helpers"
 import { SubjectIcon } from "./subject-icon"
 import { StudyDocViewer } from "./study-doc-viewer"
-import type { PlannerData, SubjectKey, StudyDoc } from "@/lib/planner/types"
+import { useExams } from "@/components/exams/exams-context"
+import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
+import type { DynamicStudyPlan, PlannerData, SubjectKey, StudyDoc } from "@/lib/planner/types"
 
 interface Props {
   data: PlannerData
@@ -17,10 +19,15 @@ interface Props {
 }
 
 export function ScheduleTab({ data, toggleDaily, attachDoc, removeDoc }: Props) {
+  const { dynamicPlan, activeExams } = useExams()
   const [openWeek, setOpenWeek] = useState<number>(0)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const todayKey = getTodayStr()
   const allStudyDays = Object.keys(DAILY).sort()
+
+  if (Object.keys(dynamicPlan.byDate).length > 0) {
+    return <DynamicSchedule plan={dynamicPlan} exams={activeExams} />
+  }
 
   return (
     <div className="space-y-2.5">
@@ -315,6 +322,86 @@ export function ScheduleTab({ data, toggleDaily, attachDoc, removeDoc }: Props) 
               )}
             </AnimatePresence>
           </motion.article>
+        )
+      })}
+    </div>
+  )
+}
+
+function DynamicSchedule({ plan, exams }: { plan: DynamicStudyPlan; exams: ReturnType<typeof useExams>["activeExams"] }) {
+  const today = formatISODate(new Date())
+  const weeks = Array.from(new Set(Object.keys(plan.byDate).map((date) => {
+    const d = parseISODate(date)
+    const monday = new Date(d)
+    const day = monday.getDay() || 7
+    monday.setDate(monday.getDate() - day + 1)
+    return formatISODate(monday)
+  }))).sort()
+
+  return (
+    <div className="space-y-2.5">
+      <p className="px-0.5 text-[12px] leading-relaxed text-stone-600">
+        Piano aggiornato automaticamente in base a oggi, agli argomenti completati e alle prossime scadenze.
+      </p>
+      {weeks.map((weekStart) => {
+        const weekDates = Object.keys(plan.byDate).filter((date) => {
+          const d = parseISODate(date)
+          const start = parseISODate(weekStart)
+          const end = new Date(start)
+          end.setDate(start.getDate() + 6)
+          return d >= start && d <= end
+        }).sort()
+        const isCurrent = weekDates.includes(today)
+        const isPast = weekDates.every((date) => date < today)
+        const sessions = weekDates.flatMap((date) => plan.byDate[date])
+        const weekNumber = weeks.indexOf(weekStart) + 1
+        const labels = weekDates.length ? `${weekDates[0].slice(5)} – ${weekDates.at(-1)?.slice(5)}` : weekStart
+
+        return (
+          <details key={weekStart} open={isCurrent || !isPast} className={`card-quiet overflow-hidden ${isCurrent ? "ring-1 ring-amber-300" : ""}`}>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5">
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+                  {isCurrent ? "Settimana corrente" : isPast ? "Settimana archiviata" : `Settimana ${weekNumber}`}
+                </div>
+                <div className="mt-0.5 text-[14.5px] font-semibold text-stone-900">{labels}</div>
+              </div>
+              <div className="text-right text-[11px] text-stone-500">{sessions.length} sessioni</div>
+            </summary>
+            {!isPast && (
+              <div className="space-y-1.5 border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-2">
+                {weekDates.map((date) => {
+                  const daySessions = plan.byDate[date]
+                  const dayLabel = parseISODate(date).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "short" })
+                  return (
+                    <div key={date} className={`rounded-xl border bg-white p-3 ${date === today ? "border-amber-300" : "border-[var(--border-subtle)]"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-semibold capitalize text-stone-800">{dayLabel}</span>
+                        {date === today && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-800">Oggi</span>}
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {daySessions.map((session) => {
+                          const exam = exams.find((item) => item.id === session.examId)
+                          const daysLeft = exam?.examDate ? Math.max(0, Math.round((parseISODate(exam.examDate).getTime() - parseISODate(today).getTime()) / 86400000)) : null
+                          return (
+                            <div key={`${session.examId}-${session.date}`} className="rounded-lg border border-stone-100 bg-stone-50/70 px-2.5 py-2">
+                              <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-stone-700">
+                                <span>{exam?.name ?? "Esame"}</span>
+                                {daysLeft !== null && <span className="text-stone-500">{daysLeft}g</span>}
+                              </div>
+                              <div className="mt-0.5 text-[11px] text-stone-500">
+                                {session.isReview ? "Ripasso finale" : session.topics.length ? session.topics.join(", ") : "Consolidamento"} · {session.hours.max.toFixed(1)}h
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </details>
         )
       })}
     </div>

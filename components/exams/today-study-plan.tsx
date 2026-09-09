@@ -25,11 +25,11 @@ function loadDismissed(day: string): Set<string> {
   }
 }
 
-function computeStreak(exams: ReturnType<typeof useExams>["activeExams"]): number {
+function computeStreak(plan: ReturnType<typeof useExams>["dynamicPlan"]): number {
   const completedDates = new Set<string>()
-  for (const exam of exams) {
-    for (const [date, day] of Object.entries(exam.studyPlan.dailySchedule)) {
-      if (day.completed) completedDates.add(date)
+  for (const sessions of Object.values(plan.byDate)) {
+    if (sessions.some((session) => session.completed)) {
+      completedDates.add(sessions[0].date)
     }
   }
 
@@ -70,7 +70,7 @@ export function TodayStudyPlan() {
   const todayTasks = useMemo(
     () =>
       activeExams
-        .map((exam) => ({ exam, day: exam.studyPlan.dailySchedule[today] }))
+        .map((exam) => ({ exam, day: dynamicPlan.byExam[exam.id]?.[today] }))
         .filter((entry) => entry.day && !dismissed.has(entry.exam.id)),
     [activeExams, today, dismissed],
   )
@@ -86,7 +86,7 @@ export function TodayStudyPlan() {
   // aggiunta/modifica/completamento esame (persistRebalancedActiveExams in lib/supabase/exams.ts).
   const todayLoad = useMemo(() => computeBalancedSchedule(activeExams)[today], [activeExams, today])
 
-  const streak = useMemo(() => computeStreak(activeExams), [activeExams])
+  const streak = useMemo(() => computeStreak(dynamicPlan), [dynamicPlan])
 
   if (loading) {
     return (
