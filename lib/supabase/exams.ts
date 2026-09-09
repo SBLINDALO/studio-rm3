@@ -2,8 +2,6 @@ import { supabase } from "./client"
 import { ensureAnonymousSession } from "./session"
 import type { ArchivedExam, CustomExam, DynamicExam, ExamDailyProgress, StudyPlan } from "@/lib/planner/types"
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
-import { calculateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
-import { computeRebalancedExams } from "@/lib/planner/algorithms/load-balancer"
 
 // Non deve mai propagare l'errore grezzo di Supabase ("Auth session missing!") all'utente:
 // se la sessione manca prova a ristabilirla una volta, poi fallisce con un messaggio chiaro.
@@ -67,7 +65,6 @@ export async function addCustomExam(exam: Omit<DynamicExam, "id" | "createdAt">)
     console.error("[addCustomExam] insert su dynamic_exams fallita:", { message: error.message, code: error.code, details: error.details, hint: error.hint })
     throw error
   }
-  await persistRebalancedActiveExams()
   return getAllExams()
 }
 
@@ -90,7 +87,6 @@ export async function restoreExam(id: string) {
   const { error } = await supabase.from("dynamic_exams").update({ status: "active" }).eq("id", id)
   if (error) throw error
   // Il ripristino re-inserisce l'esame nel pool attivo: equivale a un'aggiunta ai fini del carico
-  await persistRebalancedActiveExams()
   return getAllExams()
 }
 
@@ -110,37 +106,12 @@ export async function updateExamMaterial(
   if (examDatePostponed && merged.startDate < formatISODate(new Date())) {
     merged.startDate = formatISODate(new Date())
   }
-  const studyPlan = updates.studyPlan ?? calculateStudyPlan(merged, exam.studyPlan)
   const { error } = await supabase
     .from("dynamic_exams")
-    .update({ name: merged.name, start_date: merged.startDate, exam_date: merged.examDate, type: merged.examType ?? null, cfu: merged.cfu ?? null, material: merged.material, study_plan: studyPlan, status: merged.status })
+    .update({ name: merged.name, start_date: merged.startDate, exam_date: merged.examDate, type: merged.examType ?? null, cfu: merged.cfu ?? null, material: merged.material, status: merged.status })
     .eq("id", exam.id)
   if (error) throw error
-  await persistRebalancedActiveExams()
   return getAllExams()
-}
-
-// Scrive il solo study_plan senza ricalcoli né ribilanciamento: è il canale usato da
-// persistRebalancedActiveExams, quindi NON deve a sua volta triggerare il ribilanciamento.
-async function saveStudyPlan(examId: string, studyPlan: StudyPlan) {
-  await getUserId()
-  const { error } = await supabase.from("dynamic_exams").update({ study_plan: studyPlan }).eq("id", examId)
-  if (error) throw error
-}
-
-// Persiste il ribilanciamento del carico tra gli esami attivi.
-// Chiamata SOLO dopo mutazioni esplicite (aggiunta, modifica, completamento, ripristino),
-// mai durante il render: aprire la tab "Oggi" non deve scrivere su Supabase.
-// Best-effort: un fallimento qui non invalida la mutazione principale già riuscita.
-async function persistRebalancedActiveExams() {
-  try {
-    const { dynamicExams } = await getAllExams()
-    const activeExams = dynamicExams.filter((exam) => exam.status === "active")
-    const changed = computeRebalancedExams(activeExams)
-    await Promise.all(changed.map((exam) => saveStudyPlan(exam.id, exam.studyPlan)))
-  } catch (error) {
-    console.error("[persistRebalancedActiveExams] ribilanciamento non persistito:", error)
-  }
 }
 
 export async function saveExamDailyProgress(progress: Omit<ExamDailyProgress, "id" | "user_id" | "created_at">) {
@@ -188,7 +159,6 @@ export async function setDayCompletion(exam: DynamicExam, date: string, complete
   })
   const { error } = await supabase.from("dynamic_exams").update({ study_plan: studyPlan }).eq("id", exam.id)
   if (error) throw error
-  await persistRebalancedActiveExams()
   return getAllExams()
 }
 

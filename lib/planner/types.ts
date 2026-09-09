@@ -55,6 +55,21 @@ export interface StudyProgress {
   updated_at: string
 }
 
+export interface DerivedStudySession {
+  examId: string
+  date: string
+  pages?: number
+  hours: { min: number; max: number }
+  topics: string[]
+  completed: boolean
+  isReview?: boolean
+}
+
+export interface DynamicStudyPlan {
+  byDate: Record<string, DerivedStudySession[]>
+  byExam: Record<string, Record<string, DerivedStudySession>>
+}
+
 export interface DynamicExam {
   id: string
   name: string

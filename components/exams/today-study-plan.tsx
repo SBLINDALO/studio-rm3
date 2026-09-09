@@ -46,7 +46,7 @@ function computeStreak(exams: ReturnType<typeof useExams>["activeExams"]): numbe
 }
 
 export function TodayStudyPlan() {
-  const { activeExams, loading, markDayAheadAsCompleted, setDayCompletion } = useExams()
+  const { activeExams, dynamicPlan, loading, markDayAheadAsCompleted, setDayCompletion } = useExams()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const today = formatISODate(new Date())
   const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed(today))

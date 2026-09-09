@@ -212,6 +212,49 @@ export function generateStudyPlan(
  * Riduce proporzionalmente solo le sessioni generate automaticamente quando
  * il totale giornaliero supera il limite configurato.
  */
+export function calculateDynamicStudyPlan(
+  exams: DynamicExam[],
+  progress: Array<{ exam_id: string; date: string; topicsCompleted: string[]; completed: boolean }>,
+  today: string,
+): import("@/lib/planner/types").DynamicStudyPlan {
+  const byDate: import("@/lib/planner/types").DynamicStudyPlan["byDate"] = {}
+  const byExam: import("@/lib/planner/types").DynamicStudyPlan["byExam"] = {}
+  const completed = new Set(progress.filter((item) => item.completed).flatMap((item) => item.topicsCompleted.map((topic) => `${item.exam_id}:${topic}`)))
+
+  for (const exam of exams.filter((item) => item.status === "active" && item.examDate && item.examDate >= today)) {
+    const { pages, topics } = calculateMaterialQuantity(exam.material)
+    const start = parseISODate(exam.startDate < today ? today : exam.startDate)
+    const examDate = parseISODate(exam.examDate as string)
+    const studyDates: string[] = []
+    for (let date = start; date < examDate; date = addDays(date, 1)) {
+      if (isWeekday(date)) studyDates.push(formatISODate(date))
+    }
+    const reviewStart = Math.max(0, studyDates.length - REVIEW_DAYS_BEFORE)
+    const remainingTopics = topics.filter((topic) => !completed.has(`${exam.id}:${topic}`))
+    const activeDates = studyDates.slice(0, reviewStart)
+    const topicChunk = activeDates.length ? Math.max(1, Math.ceil(remainingTopics.length / activeDates.length)) : 0
+    const pageChunk = activeDates.length && pages ? Math.ceil(pages / activeDates.length) : undefined
+    byExam[exam.id] = {}
+
+    studyDates.forEach((date, index) => {
+      const isReview = index >= reviewStart
+      const session: import("@/lib/planner/types").DerivedStudySession = {
+        examId: exam.id,
+        date,
+        hours: exam.cfu === 12 ? { min: 1, max: 2 } : { min: 1, max: 1.5 },
+        topics: isReview ? ["Ripasso finale"] : remainingTopics.slice(index * topicChunk, (index + 1) * topicChunk),
+        completed: progress.some((item) => item.exam_id === exam.id && item.date === date && item.completed),
+        ...(isReview ? { isReview: true } : {}),
+        ...(pageChunk ? { pages: Math.min(pageChunk, pages - index * pageChunk) } : {}),
+      }
+      byExam[exam.id][date] = session
+      byDate[date] = [...(byDate[date] ?? []), session]
+    })
+  }
+
+  return { byDate, byExam }
+}
+
 function enforceDailyCap(sessions: DailySession[], dailyMaxHours: number): DailySession[] {
   const byDate = new Map<string, DailySession[]>()
   for (const session of sessions) {
