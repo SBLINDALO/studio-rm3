@@ -221,7 +221,7 @@ export function calculateDynamicStudyPlan(
   const byExam: import("@/lib/planner/types").DynamicStudyPlan["byExam"] = {}
   const completed = new Set(progress.filter((item) => item.completed).flatMap((item) => item.topicsCompleted.map((topic) => `${item.exam_id}:${topic}`)))
 
-  for (const exam of exams.filter((item) => item.status === "active" && item.examDate && item.examDate >= today)) {
+  for (const exam of exams.filter((item) => (item.status === "active" || item.status === "planning") && item.examDate && item.examDate >= today)) {
     const { pages, topics } = calculateMaterialQuantity(exam.material)
     const start = parseISODate(exam.startDate < today ? today : exam.startDate)
     const examDate = parseISODate(exam.examDate as string)

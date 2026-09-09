@@ -49,6 +49,8 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
       setError(null)
       const { dynamicExams } = await getAllExams()
       setExams(dynamicExams)
+      const progress = await Promise.all(dynamicExams.map((exam) => getExamDailyProgress(exam.id)))
+      setDailyProgress(progress.flat())
     } catch (err) {
       setError(err instanceof Error ? err.message : "Impossibile caricare gli esami")
     } finally {
@@ -132,7 +134,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
   )
 
   const setDayCompletion = useCallback(async (exam: DynamicExam, date: string, completed: boolean) => {
-    const day = exam.studyPlan.dailySchedule[date]
+    const day = calculateDynamicStudyPlan([exam], dailyProgress, date).byExam[exam.id]?.[date]
     if (!day) return
     const updatedExam: DynamicExam = {
       ...exam,
@@ -179,7 +181,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
     } catch {
       savePending()
     }
-  }, [])
+  }, [dailyProgress])
 
   const markDayAheadAsCompleted = useCallback(async (examId: string, date: string) => {
     const { dynamicExams } = await markDayAheadAsCompletedInSupabase(examId, date)
@@ -188,9 +190,13 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
 
   const activeExams = useMemo(() => exams.filter((exam) => exam.status === "active"), [exams])
   const planningExams = useMemo(() => exams.filter((exam) => exam.status === "planning"), [exams])
+  const planExams = useMemo(
+    () => exams.filter((exam) => exam.status === "active" || exam.status === "planning"),
+    [exams],
+  )
   const dynamicPlan = useMemo(
-    () => calculateDynamicStudyPlan(activeExams, dailyProgress, new Date().toISOString().slice(0, 10)),
-    [activeExams, dailyProgress],
+    () => calculateDynamicStudyPlan(planExams, dailyProgress, new Date().toISOString().slice(0, 10)),
+    [planExams, dailyProgress],
   )
 
   const value: ExamsContextValue = {
