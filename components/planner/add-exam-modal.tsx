@@ -1,8 +1,8 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { FileText, Plus, X } from "lucide-react"
-import { useState } from "react"
+import { FileText, Plus, X, Upload, Loader2 } from "lucide-react"
+import { useState, type ChangeEvent } from "react"
 import type { DynamicExam } from "@/lib/planner/types"
 import { calculateStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
 import { formatISODate } from "@/lib/planner/utils/dates"
@@ -39,16 +39,41 @@ export function AddExamModal({ open, onClose, onAdd }: Props) {
   const [cfu, setCfu] = useState<NonNullable<DynamicExam["cfu"]>>(6)
   const [pages, setPages] = useState("")
   const [notes, setNotes] = useState("")
+  const [files, setFiles] = useState<NonNullable<DynamicExam["material"]["files"]>>([])
+  const [readingFiles, setReadingFiles] = useState(false)
   const [error, setError] = useState("")
 
-  const reset = () => { setName(""); setDate(""); setType("pages"); setExamType("Scritto"); setCfu(6); setPages(""); setNotes(""); setError("") }
+  const reset = () => { setName(""); setDate(""); setType("pages"); setExamType("Scritto"); setCfu(6); setPages(""); setNotes(""); setFiles([]); setReadingFiles(false); setError("") }
   const close = () => { reset(); onClose() }
+  const handleFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files ?? [])
+    if (!selected.length) return
+    setReadingFiles(true)
+    try {
+      const imported = await Promise.all(selected.map(async (file) => {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result))
+          reader.onerror = () => reject(reader.error)
+          reader.readAsDataURL(file)
+        })
+        return { name: file.name, url: dataUrl, dataUrl, size: file.size }
+      }))
+      setFiles((current) => [...current, ...imported])
+      const estimatedPages = selected.reduce((total, file) => total + Math.max(1, Math.ceil(file.size / 50000)), 0)
+      setPages((current) => String((Number(current) || 0) + estimatedPages))
+      setType("mixed")
+      setError("")
+    } catch { setError("Non è stato possibile leggere il file") }
+    finally { setReadingFiles(false); event.target.value = "" }
+  }
   const add = async () => {
     if (!name.trim()) { setError("Inserisci il nome dell'esame"); return }
-    const startDate = formatISODate(new Date())
+    const startDate = "2026-09-21"
     const material: DynamicExam["material"] = {
       type,
       totalPages: pages ? Number(pages) : undefined,
+      files: files.length ? files : undefined,
       notes: notes.trim() || undefined,
     }
     // Senza data l'esame resta "planning": nessun piano da calcolare, il materiale può essere aggiunto anche dopo
@@ -89,9 +114,16 @@ export function AddExamModal({ open, onClose, onAdd }: Props) {
         <div><p className="mb-1 text-xs font-medium text-stone-600">Materiale</p><div className="grid grid-cols-4 gap-2">{materialTypes.map((item) => <button type="button" key={item.value} onClick={() => setType(item.value)} className={`rounded-xl border px-2 py-2 text-xs ${type === item.value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-stone-50 text-stone-700"}`}>{item.label}</button>)}</div></div>
         {(type === "pages" || type === "mixed") && <label className="block text-xs font-medium text-stone-600">Pagine totali<input type="number" min="1" value={pages} onChange={(event) => setPages(event.target.value)} className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Es. 240" /></label>}
         {(type === "notes" || type === "mixed") && <label className="block text-xs font-medium text-stone-600">Note<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 min-h-20 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm" placeholder="Argomenti o capitoli da studiare" /></label>}
-        {type === "pdf" && <p className="flex items-center gap-2 rounded-xl bg-stone-50 p-3 text-xs text-stone-500"><FileText size={15} />Il PDF potrà essere collegato dalla scheda dell'esame.</p>}
+        <div className="rounded-xl border border-dashed border-stone-300 bg-stone-50 p-3">
+          <label className="flex cursor-pointer items-center gap-3 text-xs text-stone-600">
+            {readingFiles ? <Loader2 className="animate-spin" size={17} /> : <Upload size={17} />}
+            <span><strong className="block text-stone-800">Aggiungi dispense o appunti</strong><span>PDF, immagini e file di testo · il tempo viene stimato automaticamente</span></span>
+            <input type="file" multiple accept=".pdf,.txt,.md,.png,.jpg,.jpeg" onChange={handleFiles} className="sr-only" disabled={readingFiles} />
+          </label>
+          {files.length > 0 && <div className="mt-2 flex flex-col gap-1 text-[11px] text-stone-500">{files.map((file) => <div key={file.name} className="flex items-center justify-between gap-2"><span className="truncate">{file.name}</span><button type="button" onClick={() => setFiles((current) => current.filter((item) => item.name !== file.name))} aria-label={`Rimuovi ${file.name}`}><X size={13} /></button></div>)}</div>}
+        </div>
         {error && <p className="text-xs text-rose-600">{error}</p>}
-        <button type="button" onClick={add} className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 py-3.5 text-sm font-semibold text-white"><Plus size={16} />Aggiungi esame</button>
+        <button type="button" onClick={add} disabled={readingFiles} className="flex w-full items-center justify-center gap-2 rounded-xl bg-stone-900 py-3.5 text-sm font-semibold text-white disabled:opacity-50"><Plus size={16} />Avvia calcolo e aggiungi esame</button>
       </div>
     </motion.div>
   </>}</AnimatePresence>

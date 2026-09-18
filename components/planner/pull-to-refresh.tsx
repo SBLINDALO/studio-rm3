@@ -59,6 +59,7 @@ export function PullToRefresh({ onRefresh, children }: Props) {
         dragDirectionLock
         dragConstraints={{ top: 0, bottom: THRESHOLD + 24 }}
         dragElastic={{ top: 0, bottom: 0.55 }}
+        dragListener={false}
         style={{ y }}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
