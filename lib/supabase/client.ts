@@ -8,9 +8,20 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
 // Keep the preview usable when Supabase has not been connected yet. Callers already
 // handle request failures and fall back to the local app state where appropriate.
+const browserStorage = typeof window !== "undefined" ? window.localStorage : undefined
+
 export const supabase = createClient(
   supabaseUrl ?? "https://placeholder.supabase.co",
-  supabaseAnonKey ?? "placeholder-anon-key"
+  supabaseAnonKey ?? "placeholder-anon-key",
+  {
+    auth: {
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      persistSession: true,
+      storage: browserStorage,
+      storageKey: "studio-rm3.supabase.auth.token",
+    },
+  }
 )
 
 // Tipo per le righe di user_progress
