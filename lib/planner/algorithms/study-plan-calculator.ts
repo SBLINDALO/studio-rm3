@@ -59,7 +59,9 @@ export function calculateStudyPlan(exam: DynamicExam, previousPlan?: StudyPlan):
     }
   }
 
-  const start = parseISODate(exam.startDate)
+  const configuredStart = parseISODate(exam.startDate)
+  const planStart = parseISODate("2026-09-21")
+  const start = configuredStart < planStart ? planStart : configuredStart
   const examDate = parseISODate(exam.examDate)
   const totalDaysAvailable = daysBetween(start, examDate)
   const reviewDaysBefore = REVIEW_DAYS_BEFORE
