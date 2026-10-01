@@ -14,6 +14,7 @@ import {
   updateExamMaterial as updateExamMaterialInSupabase,
   setDayCompletion as setDayCompletionInSupabase,
   markDayAheadAsCompleted as markDayAheadAsCompletedInSupabase,
+  saveExamDailyProgress as saveExamDailyProgressInSupabase,
 } from "@/lib/supabase/exams"
 
 interface ExamsContextValue {
@@ -29,6 +30,8 @@ interface ExamsContextValue {
   updateExamMaterial: (exam: DynamicExam, updates: Partial<Pick<DynamicExam, "name" | "examDate" | "startDate" | "material" | "examType" | "cfu" | "status">>) => Promise<void>
   setDayCompletion: (exam: DynamicExam, date: string, completed: boolean) => Promise<void>
   markDayAheadAsCompleted: (examId: string, date: string) => Promise<void>
+  getDayProgress: (examId: string, date: string) => ExamDailyProgress | undefined
+  saveDayProgress: (exam: DynamicExam, date: string, updates: { topicsCompleted?: string[]; pagesCompleted?: number }) => Promise<void>
   dynamicPlan: DynamicStudyPlan
 }
 
@@ -188,6 +191,47 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
     setExams(dynamicExams)
   }, [])
 
+  const getDayProgress = useCallback((examId: string, date: string) => {
+    return dailyProgress.find((item) => item.exam_id === examId && item.date === date)
+  }, [dailyProgress])
+
+  const saveDayProgress = useCallback(async (
+    exam: DynamicExam,
+    date: string,
+    updates: { topicsCompleted?: string[]; pagesCompleted?: number },
+  ) => {
+    const day = calculateDynamicStudyPlan([exam], dailyProgress, date).byExam[exam.id]?.[date]
+    if (!day) return
+
+    const current = dailyProgress.find((item) => item.exam_id === exam.id && item.date === date)
+    const nextProgress: PendingDailyProgress = {
+      exam_id: exam.id,
+      date,
+      pagesCompleted: updates.pagesCompleted ?? current?.pagesCompleted ?? 0,
+      topicsCompleted: updates.topicsCompleted ?? current?.topicsCompleted ?? [],
+      hoursStudied: current?.hoursStudied ?? (current?.completed ?? day.completed ? day.hours.max : 0),
+      completed: current?.completed ?? day.completed,
+      notes: current?.notes ?? null,
+    }
+
+    setDailyProgress((list) => {
+      const next = [...list]
+      const idx = next.findIndex((item) => item.exam_id === exam.id && item.date === date)
+      if (idx >= 0) next[idx] = { ...next[idx], ...nextProgress }
+      else next.push(nextProgress)
+      return next
+    })
+
+    const saved = await saveExamDailyProgressInSupabase(nextProgress)
+    setDailyProgress((list) => {
+      const next = [...list]
+      const idx = next.findIndex((item) => item.exam_id === exam.id && item.date === date)
+      if (idx >= 0) next[idx] = saved
+      else next.push(saved)
+      return next
+    })
+  }, [dailyProgress])
+
   const activeExams = useMemo(() => exams.filter((exam) => exam.status === "active"), [exams])
   const planningExams = useMemo(() => exams.filter((exam) => exam.status === "planning"), [exams])
   const planExams = useMemo(
@@ -212,6 +256,8 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
     updateExamMaterial,
     setDayCompletion,
     markDayAheadAsCompleted,
+    getDayProgress,
+    saveDayProgress,
     dynamicPlan,
   }
 

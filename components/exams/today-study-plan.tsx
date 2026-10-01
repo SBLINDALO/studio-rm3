@@ -46,8 +46,9 @@ function computeStreak(plan: ReturnType<typeof useExams>["dynamicPlan"]): number
 }
 
 export function TodayStudyPlan() {
-  const { activeExams, dynamicPlan, loading, markDayAheadAsCompleted, setDayCompletion } = useExams()
+  const { activeExams, dynamicPlan, loading, markDayAheadAsCompleted, setDayCompletion, getDayProgress, saveDayProgress } = useExams()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [pagesDraft, setPagesDraft] = useState<Record<string, string>>({})
   const today = formatISODate(new Date())
   const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed(today))
 
@@ -169,7 +170,13 @@ export function TodayStudyPlan() {
         <div className="relative mt-3 space-y-2">
           {todayTasks.map(({ exam, day }, i) => {
             if (!day) return null
-            const isOpen = expanded[exam.id] ?? true
+            const progress = getDayProgress(exam.id, today)
+            const topicsCompleted = new Set(progress?.topicsCompleted ?? [])
+            const pagesCompleted = progress?.pagesCompleted ?? 0
+            const pageTotal = day.pages ?? 0
+            const pageDraftKey = `${exam.id}__${today}`
+            const pageDraft = pagesDraft[pageDraftKey] ?? String(Math.min(pagesCompleted, pageTotal))
+            const isOpen = expanded[exam.id] ?? !day.completed
             return (
               <motion.div
                 key={exam.id}
@@ -192,13 +199,6 @@ export function TodayStudyPlan() {
                       </span>
                     )}
                   </button>
-                  <label className="flex items-center gap-2 text-xs text-stone-500">
-                    <Checkbox
-                      checked={day.completed}
-                      onCheckedChange={(checked) => setDayCompletion(exam, today, checked === true)}
-                    />
-                    Fatto
-                  </label>
                   <button
                     type="button"
                     onClick={() => { void markDayAheadAsCompleted(exam.id, today) }}
@@ -228,10 +228,68 @@ export function TodayStudyPlan() {
                       transition={SPRING_FILL}
                       className="overflow-hidden"
                     >
-                      <div className="mt-2 text-xs text-stone-600">
-                        {day.pages ? `${day.pages} pagine` : null}
-                        {day.pages && day.topics?.length ? " · " : null}
-                        {day.topics?.length ? day.topics.join(", ") : null}
+                      <div className="mt-2 space-y-3 text-xs text-stone-600">
+                        {day.topics.length > 0 && (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]/70 p-2.5">
+                            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.1em] text-stone-500">Argomenti</div>
+                            <div className="space-y-2">
+                              {day.topics.map((topic) => {
+                                const checked = topicsCompleted.has(topic)
+                                return (
+                                  <label key={topic} className="flex items-start gap-2">
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(nextChecked) => {
+                                        const selected = new Set(topicsCompleted)
+                                        if (nextChecked === true) selected.add(topic)
+                                        else selected.delete(topic)
+                                        void saveDayProgress(exam, today, { topicsCompleted: [...selected] })
+                                      }}
+                                    />
+                                    <span className="leading-snug text-stone-700 dark:text-stone-200">{topic}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {day.pages ? (
+                          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)]/70 p-2.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-stone-700 dark:text-stone-200">Pagine: {Math.min(pagesCompleted, pageTotal)} / {pageTotal}</span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={pageTotal}
+                                value={pageDraft}
+                                onChange={(event) => {
+                                  setPagesDraft((prev) => ({ ...prev, [pageDraftKey]: event.target.value }))
+                                }}
+                                className="h-8 w-20 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)]/90 px-2 text-xs text-stone-800 shadow-sm focus:outline-none focus:ring-1 focus:ring-[var(--border)]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const parsed = Number(pageDraft)
+                                  const clamped = Number.isFinite(parsed) ? Math.min(Math.max(Math.round(parsed), 0), pageTotal) : 0
+                                  void saveDayProgress(exam, today, { pagesCompleted: clamped })
+                                }}
+                                className="h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-2.5 text-xs font-medium text-stone-700 transition hover:bg-[var(--bg-subtle)]"
+                              >
+                                Salva
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <label className="flex items-center gap-2 text-xs text-stone-600">
+                          <Checkbox
+                            checked={day.completed}
+                            onCheckedChange={(checked) => setDayCompletion(exam, today, checked === true)}
+                          />
+                          Sessione completata
+                        </label>
                       </div>
                     </motion.div>
                   )}
