@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import type { DynamicExam, DynamicStudyPlan } from "@/lib/planner/types"
 import type { ExamDailyProgress } from "@/lib/planner/types"
+import type { TopicsByExam } from "@/lib/planner/types"
 import { calculateDynamicStudyPlan } from "@/lib/planner/algorithms/study-plan-calculator"
 import { getExamDailyProgress } from "@/lib/supabase/exams"
 import { supabase } from "@/lib/supabase/client"
@@ -40,6 +41,11 @@ type PendingDailyProgress = Omit<ExamDailyProgress, "id" | "user_id" | "created_
 const PENDING_PROGRESS_KEY = "studio-rm3.pending-exam-daily-progress"
 
 const ExamsContext = createContext<ExamsContextValue | null>(null)
+
+function plannerTopicsForExam(exam: DynamicExam): string[] {
+  if (exam.examTopics?.length) return exam.examTopics.map((topic) => topic.trim()).filter(Boolean)
+  return exam.material.notes?.split("\n").map((topic) => topic.trim()).filter(Boolean) ?? []
+}
 
 export function ExamsProvider({ children }: { children: ReactNode }) {
   const [exams, setExams] = useState<DynamicExam[]>([])
@@ -137,7 +143,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
   )
 
   const setDayCompletion = useCallback(async (exam: DynamicExam, date: string, completed: boolean) => {
-    const day = calculateDynamicStudyPlan([exam], dailyProgress, date).byExam[exam.id]?.[date]
+    const day = calculateDynamicStudyPlan([exam], dailyProgress, date, { [exam.id]: plannerTopicsForExam(exam) }).byExam[exam.id]?.[date]
     if (!day) return
     const updatedExam: DynamicExam = {
       ...exam,
@@ -200,7 +206,7 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
     date: string,
     updates: { topicsCompleted?: string[]; pagesCompleted?: number },
   ) => {
-    const day = calculateDynamicStudyPlan([exam], dailyProgress, date).byExam[exam.id]?.[date]
+    const day = calculateDynamicStudyPlan([exam], dailyProgress, date, { [exam.id]: plannerTopicsForExam(exam) }).byExam[exam.id]?.[date]
     if (!day) return
 
     const current = dailyProgress.find((item) => item.exam_id === exam.id && item.date === date)
@@ -238,9 +244,13 @@ export function ExamsProvider({ children }: { children: ReactNode }) {
     () => exams.filter((exam) => exam.status === "active" || exam.status === "planning"),
     [exams],
   )
+  const topicsByExam = useMemo<TopicsByExam>(
+    () => Object.fromEntries(planExams.map((exam) => [exam.id, plannerTopicsForExam(exam)])),
+    [planExams],
+  )
   const dynamicPlan = useMemo(
-    () => calculateDynamicStudyPlan(planExams, dailyProgress, new Date().toISOString().slice(0, 10)),
-    [planExams, dailyProgress],
+    () => calculateDynamicStudyPlan(planExams, dailyProgress, new Date().toISOString().slice(0, 10), topicsByExam),
+    [planExams, dailyProgress, topicsByExam],
   )
 
   const value: ExamsContextValue = {

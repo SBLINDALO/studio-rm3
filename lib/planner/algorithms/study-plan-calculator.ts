@@ -1,5 +1,5 @@
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
-import type { DynamicExam, StudyPlan } from "@/lib/planner/types"
+import type { DynamicExam, StudyPlan, TopicsByExam } from "@/lib/planner/types"
 import { DEFAULT_CONFIG, type DailySession, type Exam, type StudyPlanConfig } from "../types-exam"
 
 const WEEKLY_LOAD_WEIGHTS: Record<number, number> = {
@@ -236,13 +236,15 @@ export function calculateDynamicStudyPlan(
   exams: DynamicExam[],
   progress: Array<{ exam_id: string; date: string; topicsCompleted: string[]; completed: boolean }>,
   today: string,
+  topicsByExam: TopicsByExam = {},
 ): import("@/lib/planner/types").DynamicStudyPlan {
   const byDate: import("@/lib/planner/types").DynamicStudyPlan["byDate"] = {}
   const byExam: import("@/lib/planner/types").DynamicStudyPlan["byExam"] = {}
   const completed = new Set(progress.filter((item) => item.completed).flatMap((item) => item.topicsCompleted.map((topic) => `${item.exam_id}:${topic}`)))
 
   for (const exam of exams.filter((item) => (item.status === "active" || item.status === "planning") && item.examDate && item.examDate >= today)) {
-    const { pages, topics } = calculateMaterialQuantity(exam.material)
+    const { pages, topics: materialTopics } = calculateMaterialQuantity(exam.material)
+    const topics = topicsByExam[exam.id]?.length ? topicsByExam[exam.id] : materialTopics
     const start = parseISODate(exam.startDate < today ? today : exam.startDate)
     const examDate = parseISODate(exam.examDate as string)
     const studyDates: string[] = []
