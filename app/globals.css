@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+.planner-surface {
+  background-color: #ffffff !important;
+  color: #202522 !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 /*
