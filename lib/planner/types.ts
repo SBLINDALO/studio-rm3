@@ -70,6 +70,21 @@ export interface DynamicStudyPlan {
   byExam: Record<string, Record<string, DerivedStudySession>>
 }
 
+export type TopicPlannerStatus = "not_started" | "in_progress" | "completed"
+
+export interface TopicNode {
+  id: string
+  label: string
+  difficulty?: number
+  status?: TopicPlannerStatus
+  lastStudiedAt?: string
+  reviewCount?: number
+  nextReviewAt?: string
+}
+
+export type TopicsByExam = Record<string, TopicNode[]>
+export type TopicProgressByExamDate = Record<string, Record<string, TopicPlannerStatus>>
+
 export interface DynamicExam {
   id: string
   name: string
@@ -84,6 +99,7 @@ export interface DynamicExam {
     notes?: string
     description?: string
   }
+  examTopics?: string[]
   studyPlan: StudyPlan
   createdAt: number
   status: "active" | "completed" | "archived" | "planning"
@@ -98,6 +114,7 @@ export interface DynamicExamRow {
   exam_date: string | null
   type: "Scritto" | "Orale" | null
   material: DynamicExam["material"]
+  exam_topics?: string[]
   study_plan: StudyPlan
   created_at: number
   status: "active" | "completed" | "archived" | "planning"

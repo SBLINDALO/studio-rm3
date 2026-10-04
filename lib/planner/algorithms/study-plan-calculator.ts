@@ -1,6 +1,16 @@
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
-import type { DynamicExam, StudyPlan } from "@/lib/planner/types"
+import type { DynamicExam, StudyPlan, TopicsByExam } from "@/lib/planner/types"
 import { DEFAULT_CONFIG, type DailySession, type Exam, type StudyPlanConfig } from "../types-exam"
+
+const WEEKLY_LOAD_WEIGHTS: Record<number, number> = {
+  0: 0.0,
+  1: 0.5,
+  2: 0.3,
+  3: 0.5,
+  4: 0.7,
+  5: 1.0,
+  6: 1.0,
+}
 
 const DAY_MS = 86_400_000
 const REVIEW_DAYS_BEFORE = 4
@@ -156,6 +166,12 @@ function isStudyDay(date: string, daysPerWeek: number): boolean {
   return day >= 1 && day <= daysPerWeek
 }
 
+function applyDayWeight(hours: number, date: string): number {
+  const day = new Date(date).getDay()
+  const weight = WEEKLY_LOAD_WEIGHTS[day] ?? 1
+  return Number((hours * weight).toFixed(2))
+}
+
 /**
  * Genera il piano di studio a partire dagli esami attivi.
  */
@@ -178,7 +194,9 @@ export function generateStudyPlan(
     let cursor = today
 
     while (cursor < lastStudyDate) {
-      if (isStudyDay(cursor, config.daysPerWeek)) availableDays.push(cursor)
+      if (isStudyDay(cursor, config.daysPerWeek) && (WEEKLY_LOAD_WEIGHTS[new Date(cursor).getDay()] ?? 1) > 0) {
+        availableDays.push(cursor)
+      }
       cursor = addDaysToDate(cursor, 1)
     }
     if (availableDays.length === 0) continue
@@ -203,11 +221,20 @@ export function generateStudyPlan(
         sessions.push({ ...override, auto: false })
         continue
       }
-      sessions.push({ date, examId: exam.id, hours: Number(hoursPerDay.toFixed(2)), auto: true, completed: false })
+      sessions.push({ date, examId: exam.id, hours: applyDayWeight(hoursPerDay, date), auto: true, completed: false })
     }
   }
 
   return enforceDailyCap(sessions, config.dailyMaxHours)
+}
+
+function plannerTopicLabels(exam: DynamicExam, topicsByExam: TopicsByExam): string[] {
+  const materialTopics = calculateMaterialQuantity(exam.material).topics
+  const source = topicsByExam[exam.id]?.length ? topicsByExam[exam.id] : materialTopics.map((label) => ({ label }))
+  const labels = source
+    .map((topic) => topic.label.trim())
+    .filter(Boolean)
+  return Array.from(new Set(labels))
 }
 
 /**
@@ -218,34 +245,56 @@ export function calculateDynamicStudyPlan(
   exams: DynamicExam[],
   progress: Array<{ exam_id: string; date: string; topicsCompleted: string[]; completed: boolean }>,
   today: string,
+  topicsByExam: TopicsByExam = {},
 ): import("@/lib/planner/types").DynamicStudyPlan {
   const byDate: import("@/lib/planner/types").DynamicStudyPlan["byDate"] = {}
   const byExam: import("@/lib/planner/types").DynamicStudyPlan["byExam"] = {}
+  const progressByExamDate = new Map<string, { completed: boolean; topicsCompleted: string[] }>()
+  progress.forEach((item) => progressByExamDate.set(`${item.exam_id}:${item.date}`, { completed: item.completed, topicsCompleted: item.topicsCompleted }))
   const completed = new Set(progress.filter((item) => item.completed).flatMap((item) => item.topicsCompleted.map((topic) => `${item.exam_id}:${topic}`)))
 
   for (const exam of exams.filter((item) => (item.status === "active" || item.status === "planning") && item.examDate && item.examDate >= today)) {
-    const { pages, topics } = calculateMaterialQuantity(exam.material)
+    const { pages } = calculateMaterialQuantity(exam.material)
+    const topics = plannerTopicLabels(exam, topicsByExam)
     const start = parseISODate(exam.startDate < today ? today : exam.startDate)
     const examDate = parseISODate(exam.examDate as string)
     const studyDates: string[] = []
     for (let date = start; date < examDate; date = addDays(date, 1)) {
-      if (isWeekday(date)) studyDates.push(formatISODate(date))
+      const dateKey = formatISODate(date)
+      if ((WEEKLY_LOAD_WEIGHTS[new Date(dateKey).getDay()] ?? 1) > 0) studyDates.push(dateKey)
     }
     const reviewStart = Math.max(0, studyDates.length - REVIEW_DAYS_BEFORE)
     const remainingTopics = topics.filter((topic) => !completed.has(`${exam.id}:${topic}`))
     const activeDates = studyDates.slice(0, reviewStart)
-    const topicChunk = activeDates.length ? Math.max(1, Math.ceil(remainingTopics.length / activeDates.length)) : 0
     const pageChunk = activeDates.length && pages ? Math.ceil(pages / activeDates.length) : undefined
     byExam[exam.id] = {}
 
     studyDates.forEach((date, index) => {
       const isReview = index >= reviewStart
+      const baseHours = exam.cfu === 12 ? { min: 1, max: 2 } : { min: 1, max: 1.5 }
+      const dayTopics: string[] = []
+
+      if (!isReview && remainingTopics.length > 0 && activeDates.length > 0) {
+      const activeIndex = index
+      const baseTopicsPerDay = Math.floor(remainingTopics.length / activeDates.length)
+      const extraTopicsDays = remainingTopics.length % activeDates.length
+      const topicsForDay = Math.max(1, baseTopicsPerDay + (activeIndex < extraTopicsDays ? 1 : 0))
+      const startOffset = Math.floor((activeIndex * remainingTopics.length) / activeDates.length)
+      for (let i = 0; i < topicsForDay; i += 1) {
+        const topic = remainingTopics[(startOffset + i) % remainingTopics.length]
+        if (!dayTopics.includes(topic)) dayTopics.push(topic)
+      }
+      }
+
       const session: import("@/lib/planner/types").DerivedStudySession = {
         examId: exam.id,
         date,
-        hours: exam.cfu === 12 ? { min: 1, max: 2 } : { min: 1, max: 1.5 },
-        topics: isReview ? ["Ripasso finale"] : remainingTopics.slice(index * topicChunk, (index + 1) * topicChunk),
-        completed: progress.some((item) => item.exam_id === exam.id && item.date === date && item.completed),
+        hours: {
+          min: applyDayWeight(baseHours.min, date),
+          max: applyDayWeight(baseHours.max, date),
+        },
+        topics: isReview ? ["Ripasso finale"] : dayTopics,
+        completed: progressByExamDate.get(`${exam.id}:${date}`)?.completed ?? false,
         ...(isReview ? { isReview: true } : {}),
         ...(pageChunk ? { pages: Math.min(pageChunk, pages - index * pageChunk) } : {}),
       }
