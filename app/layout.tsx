@@ -17,9 +17,9 @@ const _geistMono = V0_Font_Geist_Mono({ subsets: ['latin'], weight: ["100","200"
 const _sourceSerif_4 = V0_Font_Source_Serif_4({ subsets: ['latin'], weight: ["200","300","400","500","600","700","800","900"] })
 
 export const metadata: Metadata = {
-  title: 'Pianificatore Studio',
+  title: 'Disponibilità Settimanale | Piano Studio',
   description:
-    'Pianificatore di studio interattivo e personalizzabile: timer Pomodoro, tracker argomenti, piano settimanale e verifiche di fine settimana.',
+    'Definisci la tua disponibilità settimanale e lascia che il planner AI distribuisca gli argomenti in modo intelligente.',
   generator: 'v0.app',
   applicationName: 'Studio Planner',
   appleWebApp: {
