@@ -70,7 +70,20 @@ export interface DynamicStudyPlan {
   byExam: Record<string, Record<string, DerivedStudySession>>
 }
 
-export type TopicsByExam = Record<string, string[]>
+export type TopicPlannerStatus = "not_started" | "in_progress" | "completed"
+
+export interface TopicNode {
+  id: string
+  label: string
+  difficulty?: number
+  status?: TopicPlannerStatus
+  lastStudiedAt?: string
+  reviewCount?: number
+  nextReviewAt?: string
+}
+
+export type TopicsByExam = Record<string, TopicNode[]>
+export type TopicProgressByExamDate = Record<string, Record<string, TopicPlannerStatus>>
 
 export interface DynamicExam {
   id: string
