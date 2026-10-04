@@ -1,5 +1,5 @@
 import { formatISODate, parseISODate } from "@/lib/planner/utils/dates"
-import type { DynamicExam, StudyPlan, TopicNode, TopicPlannerStatus, TopicsByExam } from "@/lib/planner/types"
+import type { DynamicExam, StudyPlan, TopicsByExam } from "@/lib/planner/types"
 import { DEFAULT_CONFIG, type DailySession, type Exam, type StudyPlanConfig } from "../types-exam"
 
 const WEEKLY_LOAD_WEIGHTS: Record<number, number> = {
@@ -15,8 +15,6 @@ const WEEKLY_LOAD_WEIGHTS: Record<number, number> = {
 const DAY_MS = 86_400_000
 const REVIEW_DAYS_BEFORE = 4
 const PAGES_PER_PDF_ESTIMATE = 20
-const MINUTES_PER_TOPIC_UNIT = 40
-const REVIEW_INTERVAL_DAYS = [2, 5, 9] as const
 
 function daysBetween(startDate: Date, endDate: Date): number {
   return Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / DAY_MS))
@@ -230,65 +228,13 @@ export function generateStudyPlan(
   return enforceDailyCap(sessions, config.dailyMaxHours)
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
-}
-
-function addDaysToISODate(date: string, days: number): string {
-  return formatISODate(addDays(parseISODate(date), days))
-}
-
-function toPlannerTopics(exam: DynamicExam, topicsByExam: TopicsByExam): Array<{
-  id: string
-  label: string
-  difficulty: number
-  status: TopicPlannerStatus
-  lastStudiedAt?: string
-  reviewCount: number
-  nextReviewAt?: string
-}> {
-  const mappedFromMaterial = calculateMaterialQuantity(exam.material).topics.map((label, index) => ({
-    id: `${exam.id}:${index}:${label}`,
-    label,
-    difficulty: 1,
-    status: "not_started" as const,
-    reviewCount: 0,
-  }))
-  const source = topicsByExam[exam.id]?.length ? topicsByExam[exam.id] : mappedFromMaterial
-  const seenLabels = new Set<string>()
-  const normalized: Array<{
-    id: string
-    label: string
-    difficulty: number
-    status: TopicPlannerStatus
-    lastStudiedAt?: string
-    reviewCount: number
-    nextReviewAt?: string
-  }> = []
-  source.forEach((topic, index) => {
-    const node: TopicNode = typeof topic === "string"
-      ? { id: `${exam.id}:${index}:${topic}`, label: topic }
-      : topic
-    const label = node.label.trim()
-    if (!label || seenLabels.has(label)) return
-    seenLabels.add(label)
-    normalized.push({
-      id: node.id || `${exam.id}:${index}:${label}`,
-      label,
-      difficulty: node.difficulty && node.difficulty > 0 ? node.difficulty : 1,
-      status: node.status ?? "not_started",
-      lastStudiedAt: node.lastStudiedAt,
-      reviewCount: node.reviewCount ?? 0,
-      nextReviewAt: node.nextReviewAt,
-    })
-  })
-  return normalized
-}
-
-function topicReviewScore(topic: { difficulty: number; reviewCount: number; lastStudiedAt?: string; status: TopicPlannerStatus }, date: string): number {
-  const daysSinceStudy = topic.lastStudiedAt ? Math.max(0, daysBetween(parseISODate(topic.lastStudiedAt), parseISODate(date))) : 99
-  const statusBonus = topic.status === "in_progress" ? 2 : topic.status === "not_started" ? 1 : 0
-  return daysSinceStudy + topic.difficulty * 1.5 + statusBonus - topic.reviewCount * 0.4
+function plannerTopicLabels(exam: DynamicExam, topicsByExam: TopicsByExam): string[] {
+  const materialTopics = calculateMaterialQuantity(exam.material).topics
+  const source = topicsByExam[exam.id]?.length ? topicsByExam[exam.id] : materialTopics.map((label) => ({ label }))
+  const labels = source
+    .map((topic) => topic.label.trim())
+    .filter(Boolean)
+  return Array.from(new Set(labels))
 }
 
 /**
@@ -304,36 +250,12 @@ export function calculateDynamicStudyPlan(
   const byDate: import("@/lib/planner/types").DynamicStudyPlan["byDate"] = {}
   const byExam: import("@/lib/planner/types").DynamicStudyPlan["byExam"] = {}
   const progressByExamDate = new Map<string, { completed: boolean; topicsCompleted: string[] }>()
-  progress.forEach((item) => {
-    progressByExamDate.set(`${item.exam_id}:${item.date}`, { completed: item.completed, topicsCompleted: item.topicsCompleted })
-  })
+  progress.forEach((item) => progressByExamDate.set(`${item.exam_id}:${item.date}`, { completed: item.completed, topicsCompleted: item.topicsCompleted }))
+  const completed = new Set(progress.filter((item) => item.completed).flatMap((item) => item.topicsCompleted.map((topic) => `${item.exam_id}:${topic}`)))
 
   for (const exam of exams.filter((item) => (item.status === "active" || item.status === "planning") && item.examDate && item.examDate >= today)) {
     const { pages } = calculateMaterialQuantity(exam.material)
-    const plannerTopics = toPlannerTopics(exam, topicsByExam)
-    const topicProgressDates = new Map<string, string[]>()
-    progress
-      .filter((entry) => entry.exam_id === exam.id && entry.topicsCompleted.length > 0)
-      .forEach((entry) => {
-        entry.topicsCompleted.forEach((topic) => {
-          const key = topic.trim()
-          if (!key) return
-          const history = topicProgressDates.get(key) ?? []
-          history.push(entry.date)
-          topicProgressDates.set(key, history)
-        })
-      })
-
-    plannerTopics.forEach((topic) => {
-      const history = (topicProgressDates.get(topic.label) ?? []).sort()
-      if (!history.length) return
-      topic.lastStudiedAt = history.at(-1)
-      topic.reviewCount = Math.max(topic.reviewCount, history.length - 1)
-      topic.status = history.length >= 2 ? "completed" : "in_progress"
-      const nextIdx = Math.min(topic.reviewCount, REVIEW_INTERVAL_DAYS.length - 1)
-      topic.nextReviewAt = addDaysToISODate(topic.lastStudiedAt as string, REVIEW_INTERVAL_DAYS[nextIdx])
-    })
-
+    const topics = plannerTopicLabels(exam, topicsByExam)
     const start = parseISODate(exam.startDate < today ? today : exam.startDate)
     const examDate = parseISODate(exam.examDate as string)
     const studyDates: string[] = []
@@ -342,6 +264,7 @@ export function calculateDynamicStudyPlan(
       if ((WEEKLY_LOAD_WEIGHTS[new Date(dateKey).getDay()] ?? 1) > 0) studyDates.push(dateKey)
     }
     const reviewStart = Math.max(0, studyDates.length - REVIEW_DAYS_BEFORE)
+    const remainingTopics = topics.filter((topic) => !completed.has(`${exam.id}:${topic}`))
     const activeDates = studyDates.slice(0, reviewStart)
     const pageChunk = activeDates.length && pages ? Math.ceil(pages / activeDates.length) : undefined
     byExam[exam.id] = {}
@@ -349,75 +272,18 @@ export function calculateDynamicStudyPlan(
     studyDates.forEach((date, index) => {
       const isReview = index >= reviewStart
       const baseHours = exam.cfu === 12 ? { min: 1, max: 2 } : { min: 1, max: 1.5 }
-      const dailySlots = Math.max(1, Math.floor((baseHours.max * 60) / MINUTES_PER_TOPIC_UNIT))
-      const remainingDays = Math.max(studyDates.length - index, 1)
-      const uncompletedTopics = plannerTopics.filter((topic) => topic.status !== "completed")
-      const pendingRatio = plannerTopics.length ? uncompletedTopics.length / plannerTopics.length : 0
-      const urgency = studyDates.length ? 1 - remainingDays / studyDates.length : 0
-      const reviewShare = clamp(0.25 + 0.35 * urgency + 0.2 * (1 - pendingRatio), 0.2, 0.7)
-      const remainingSlots = remainingDays * dailySlots
-      const intensiveMode = uncompletedTopics.length > remainingSlots
-      const dueReviewTopics = plannerTopics
-        .filter((topic) => topic.status !== "not_started" && topic.nextReviewAt && topic.nextReviewAt <= date)
-        .sort((a, b) => topicReviewScore(b, date) - topicReviewScore(a, date))
-
-      let newSlots = uncompletedTopics.length > 0 ? Math.max(1, Math.round(dailySlots * (1 - reviewShare))) : 0
-      const minReviewSlots = dueReviewTopics.length > 0 ? 1 : 0
-      if (intensiveMode) newSlots = Math.max(dailySlots - minReviewSlots, 1)
-      newSlots = Math.min(newSlots, dailySlots)
-      let reviewSlots = Math.max(dailySlots - newSlots, 0)
-      if (isReview) {
-        reviewSlots = Math.max(reviewSlots, Math.floor(dailySlots * 0.6))
-        newSlots = Math.max(dailySlots - reviewSlots, 0)
-      }
-
-      const selectedIds = new Set<string>()
       const dayTopics: string[] = []
 
-      const pickNewTopics = (limit: number) => {
-        if (limit <= 0) return
-        const candidates = plannerTopics
-          .filter((topic) => topic.status === "not_started" && !selectedIds.has(topic.id))
-          .sort((a, b) => b.difficulty - a.difficulty || a.label.localeCompare(b.label))
-        candidates.slice(0, limit).forEach((topic) => {
-          selectedIds.add(topic.id)
-          dayTopics.push(topic.label)
-          topic.status = "in_progress"
-          topic.lastStudiedAt = date
-          topic.nextReviewAt = addDaysToISODate(date, REVIEW_INTERVAL_DAYS[0])
-        })
+      if (!isReview && remainingTopics.length > 0 && activeDates.length > 0) {
+      const activeIndex = index
+      const baseTopicsPerDay = Math.floor(remainingTopics.length / activeDates.length)
+      const extraTopicsDays = remainingTopics.length % activeDates.length
+      const topicsForDay = Math.max(1, baseTopicsPerDay + (activeIndex < extraTopicsDays ? 1 : 0))
+      const startOffset = Math.floor((activeIndex * remainingTopics.length) / activeDates.length)
+      for (let i = 0; i < topicsForDay; i += 1) {
+        const topic = remainingTopics[(startOffset + i) % remainingTopics.length]
+        if (!dayTopics.includes(topic)) dayTopics.push(topic)
       }
-
-      const pickReviewTopics = (limit: number, dueOnly: boolean) => {
-        if (limit <= 0) return
-        const candidates = plannerTopics
-          .filter((topic) => topic.status !== "not_started" && !selectedIds.has(topic.id))
-          .filter((topic) => !dueOnly || !topic.nextReviewAt || topic.nextReviewAt <= date)
-          .sort((a, b) => topicReviewScore(b, date) - topicReviewScore(a, date))
-        candidates.slice(0, limit).forEach((topic) => {
-          selectedIds.add(topic.id)
-          dayTopics.push(topic.label)
-          topic.reviewCount += 1
-          topic.lastStudiedAt = date
-          const nextIdx = Math.min(topic.reviewCount, REVIEW_INTERVAL_DAYS.length - 1)
-          topic.nextReviewAt = addDaysToISODate(date, REVIEW_INTERVAL_DAYS[nextIdx])
-          topic.status = topic.reviewCount >= REVIEW_INTERVAL_DAYS.length ? "completed" : "in_progress"
-        })
-      }
-
-      pickNewTopics(newSlots)
-      pickReviewTopics(reviewSlots, true)
-      if (dayTopics.length < dailySlots) pickReviewTopics(dailySlots - dayTopics.length, false)
-      if (dayTopics.length < dailySlots) pickNewTopics(dailySlots - dayTopics.length)
-
-      if (dayTopics.length === 0 && uncompletedTopics.length > 0) {
-        const fallback = uncompletedTopics.sort((a, b) => topicReviewScore(b, date) - topicReviewScore(a, date))[0]
-        if (fallback) {
-          dayTopics.push(fallback.label)
-          fallback.status = "in_progress"
-          fallback.lastStudiedAt = date
-          fallback.nextReviewAt = addDaysToISODate(date, REVIEW_INTERVAL_DAYS[0])
-        }
       }
 
       const session: import("@/lib/planner/types").DerivedStudySession = {
@@ -427,7 +293,7 @@ export function calculateDynamicStudyPlan(
           min: applyDayWeight(baseHours.min, date),
           max: applyDayWeight(baseHours.max, date),
         },
-        topics: dayTopics.length > 0 ? dayTopics : (isReview ? ["Ripasso finale"] : []),
+        topics: isReview ? ["Ripasso finale"] : dayTopics,
         completed: progressByExamDate.get(`${exam.id}:${date}`)?.completed ?? false,
         ...(isReview ? { isReview: true } : {}),
         ...(pageChunk ? { pages: Math.min(pageChunk, pages - index * pageChunk) } : {}),
